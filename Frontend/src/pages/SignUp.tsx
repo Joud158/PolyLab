@@ -50,7 +50,8 @@ export default function SignUp() {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError("Something went wrong. Please try again.");
+        const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+        setError(msg);
       }
     } finally {
       setSubmitting(false);

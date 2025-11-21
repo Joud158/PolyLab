@@ -4,7 +4,8 @@
 export const AUTH_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL_AUTH ??
     (import.meta as any).env?.API_BASE_URL_AUTH ??
-    "/api") as string;
+    "/api" ??
+    "http://localhost:8000") as string;
 
 const CSRF_COOKIE_NAME = "csrf_token";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -64,7 +65,17 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
     headers.set("x-csrf-token", token);
   }
 
-  const res = await fetch(`${AUTH_BASE_URL}${path}`, finalInit);
+  let res: Response;
+  try {
+    res = await fetch(`${AUTH_BASE_URL}${path}`, finalInit);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Network error";
+    throw new ApiError(
+      0,
+      `Network error reaching auth API. Ensure the backend is running and CORS allows this origin. (${msg})`,
+    );
+  }
+
   const text = await res.text();
   const data = text ? tryParseJSON(text) : undefined;
 
@@ -158,6 +169,14 @@ export type UserProfile = {
   email_verified: boolean;
 };
 
+export type Classroom = {
+  id: number;
+  name: string;
+  code: string;
+  instructor_id: number;
+  created_at: string;
+};
+
 export type InstructorRequest = {
   id: number;
   user_id: number;
@@ -170,6 +189,9 @@ export async function signup(body: SignupPayload): Promise<BasicOk> {
   return request("/auth/signup", {
     method: "POST",
     json: body,
+    // Signup is CSRF-exempt server-side; skipping avoids an extra round-trip
+    // that can fail when the API isn't reachable yet.
+    skipCsrf: true,
   });
 }
 
@@ -211,6 +233,26 @@ export async function getProfile(): Promise<UserProfile> {
   return request("/me", { method: "GET" });
 }
 
+// --- Classrooms ---
+
+export async function listClassrooms(): Promise<Classroom[]> {
+  return request("/classrooms", { method: "GET" });
+}
+
+export async function createClassroom(name: string): Promise<Classroom> {
+  return request("/classrooms", {
+    method: "POST",
+    json: { name },
+  });
+}
+
+export async function joinClassroom(code: string): Promise<BasicOk> {
+  return request("/classrooms/join", {
+    method: "POST",
+    json: { code },
+  });
+}
+
 export async function submitInstructorRequest(
   file: File,
   note?: string,
@@ -241,4 +283,7 @@ export const api = {
   getProfile,
   submitInstructorRequest,
   listInstructorRequests,
+  listClassrooms,
+  createClassroom,
+  joinClassroom,
 };

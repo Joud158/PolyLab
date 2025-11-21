@@ -6,9 +6,11 @@ import heroImg from "@/assets/polylab-hero.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { login, ApiError } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { refresh } = useAuth();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -33,7 +35,11 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login({ email: email.trim(), password: pw });
-      navigate("/student");
+      const profile = await refresh();
+      const role = profile?.role;
+      if (role === "admin") navigate("/admin");
+      else if (role === "instructor") navigate("/instructor");
+      else navigate("/student");
     } catch (err) {
       if (err instanceof ApiError) {
         const detail =
@@ -70,7 +76,11 @@ export default function Login() {
     setTotpSubmitting(true);
     try {
       await login({ email: email.trim(), password: pw, totp: totp.trim() });
-      navigate("/student");
+      const profile = await refresh();
+      const role = profile?.role;
+      if (role === "admin") navigate("/admin");
+      else if (role === "instructor") navigate("/instructor");
+      else navigate("/student");
     } catch (err) {
       if (err instanceof ApiError) {
         setTotpError(err.message);

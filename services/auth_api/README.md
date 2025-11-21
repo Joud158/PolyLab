@@ -1,6 +1,19 @@
-# Auth API
+# Auth API (now points to `Backend/`)
 
-FastAPI service that powers signup/login, MFA, CSRF-protected sessions, and instructor verification workflows.
+FastAPI service that powers signup/login, MFA, CSRF-protected sessions, and instructor verification workflows.  
+This package now re-exports the consolidated app in `Backend/main.py`, so running:
+
+```bash
+uvicorn services.auth_api.app:app --reload --port 8000
+```
+
+is equivalent to running:
+
+```bash
+uvicorn Backend.main:app --reload --port 8000
+```
+
+There is one code path for routers/models/config; keep env values in the repo-level `.env`.
 
 ## Prerequisites
 

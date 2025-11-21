@@ -3,6 +3,8 @@ import React, { useMemo, useState } from "react";
 import NavbarStudent from "@/components/ui/StudentNavbar";
 import { CheckCircle2, FileUp, Loader2, Shield, ChevronRight, Link } from "lucide-react";
 import bgCircuit from "@/assets/background.png"; // your background image
+import { useAuth } from "@/contexts/AuthContext";
+import { joinClassroom } from "@/lib/api";
 
 type ReqStatus = "not_submitted" | "pending" | "approved" | "rejected";
 
@@ -21,9 +23,9 @@ type Classroom = {
 };
 
 export default function StudentDashboard() {
-  // ----- Mock auth context -----
-  const email = "ridudent@polylab.dev";
-  const role: "student" | "instructor" | "admin" = "student";
+  const { user } = useAuth();
+  const email = user?.email ?? "guest@polylab.dev";
+  const role: "student" | "instructor" | "admin" = user?.role ?? "student";
 
   // ----- Request Instructor state -----
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -34,6 +36,7 @@ export default function StudentDashboard() {
   // ----- Classrooms state (mock) -----
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const [classes, setClasses] = useState<Classroom[]>([
     { id: "c1", title: "Cryptography 101", instructor: "Prof. Alice Smith", joinedAt: "Jun 27" },
     { id: "c2", title: "Network Security", instructor: "Prof. Alice Smith", joinedAt: "Jun 22" },
@@ -66,20 +69,29 @@ export default function StudentDashboard() {
 
   // ----- Join a classroom (mock) -----
   async function joinClass() {
-    if (!/^[A-Z0-9]{6,10}$/i.test(joinCode.trim())) return;
+    setJoinError(null);
+    if (!/^[A-Z0-9]{6,10}$/i.test(joinCode.trim())) {
+      setJoinError("Enter a valid join code.");
+      return;
+    }
     setJoining(true);
-    await new Promise(r => setTimeout(r, 700));
-    setClasses(prev => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        title: `Joined by Code ${joinCode.toUpperCase()}`,
-        instructor: "Pending Assignment",
-        joinedAt: new Date().toLocaleDateString(undefined, { month: "short", day: "2-digit" }),
-      },
-    ]);
-    setJoinCode("");
-    setJoining(false);
+    try {
+      await joinClassroom(joinCode.trim());
+      setClasses(prev => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          title: `Joined by Code ${joinCode.toUpperCase()}`,
+          instructor: "Your instructor",
+          joinedAt: new Date().toLocaleDateString(undefined, { month: "short", day: "2-digit" }),
+        },
+      ]);
+      setJoinCode("");
+    } catch (e) {
+      setJoinError("Unable to join. Check the code or try again.");
+    } finally {
+      setJoining(false);
+    }
   }
 
   return (
@@ -126,6 +138,7 @@ export default function StudentDashboard() {
               </div>
 
               <p className="mt-2 text-xs text-slate-500">Enter the code your instructor shared with you.</p>
+              {joinError && <p className="mt-2 text-sm text-rose-300">{joinError}</p>}
 
               <div className="mt-5 space-y-3">
                 {classes.map((c) => (
