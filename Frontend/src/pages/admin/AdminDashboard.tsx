@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import NavBarUser from "@/components/ui/NavBarUser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ApiError, AUTH_BASE_URL, listInstructorRequests, decideInstructorRequest } from "@/lib/api";
 import {
   CheckCircle2,
   Clock4,
@@ -11,6 +12,7 @@ import {
   ExternalLink,
   Search,
   UserCog,
+  ArrowUpRight,
 } from "lucide-react";
 import bgCircuit from "@/assets/background.png"; // background image
 
@@ -18,14 +20,15 @@ import bgCircuit from "@/assets/background.png"; // background image
 type RequestStatus = "pending" | "approved" | "rejected";
 
 type InstructorRequest = {
-  id: string;
-  studentName: string;
-  email: string;
-  university: string;
-  proofUrl: string;
-  submittedAt: number;
+  id: number;
   status: RequestStatus;
-  note?: string;
+  note?: string | null;
+  file_path: string;
+  user_id: number;
+  user_email?: string | null;
+  created_at: string;
+  decision_by?: number | null;
+  decided_at?: string | null;
 };
 
 type UserRow = {
@@ -35,37 +38,7 @@ type UserRow = {
   status: "active" | "disabled" | "pending";
 };
 
-// ---------------------------- Mock Data ---------------------------
-const seedRequests: InstructorRequest[] = [
-  {
-    id: "rq_1001",
-    studentName: "Maya Khalil",
-    email: "mk102@mail.aub.edu",
-    university: "American University of Beirut",
-    proofUrl: "https://example.com/proof/maya.pdf",
-    submittedAt: Date.now() - 1000 * 60 * 60 * 2,
-    status: "pending",
-  },
-  {
-    id: "rq_1002",
-    studentName: "Karim Saade",
-    email: "ks33@mail.aub.edu",
-    university: "American University of Beirut",
-    proofUrl: "https://example.com/proof/karim.pdf",
-    submittedAt: Date.now() - 1000 * 60 * 60 * 7,
-    status: "pending",
-  },
-  {
-    id: "rq_0999",
-    studentName: "Lara N.",
-    email: "lara@mail.aub.edu",
-    university: "American University of Beirut",
-    proofUrl: "https://example.com/proof/lara.pdf",
-    submittedAt: Date.now() - 1000 * 60 * 60 * 24,
-    status: "approved",
-  },
-];
-
+// ---------------------------- Mock Users --------------------------
 const seedUsers: UserRow[] = [
   { id: "u_1", email: "mk102@mail.aub.edu", role: "student", status: "active" },
   { id: "u_2", email: "prof.hussein@aub.edu.lb", role: "instructor", status: "active" },
@@ -135,8 +108,10 @@ function Toast({
 
 // ----------------------------- Page ------------------------------
 export default function AdminDashboard() {
-  const [requests, setRequests] = useState<InstructorRequest[]>(seedRequests);
+  const [requests, setRequests] = useState<InstructorRequest[]>([]);
   const [users, setUsers] = useState<UserRow[]>(seedUsers);
+  const [loading, setLoading] = useState(true);
+  const [reqError, setReqError] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{
     open: boolean;
@@ -152,6 +127,23 @@ export default function AdminDashboard() {
     return users.filter((u) => u.email.toLowerCase().includes(q));
   }, [userQuery, users]);
 
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setReqError(null);
+      try {
+        const data = await listInstructorRequests();
+        setRequests(data);
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : "Failed to load requests";
+        setReqError(msg);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
   // Stats
   const stats = useMemo(() => {
     const total = requests.length;
@@ -162,37 +154,44 @@ export default function AdminDashboard() {
   }, [requests]);
 
   // Handlers
-  function approveReq(id: string) {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: "approved" as RequestStatus } : r))
-    );
-    const req = requests.find((r) => r.id === id);
-    if (req) {
-      // optionally promote the user role in mock table
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.email === req.email ? { ...u, role: "instructor", status: "active" } : u
-        )
-      );
+  async function approveReq(id: number) {
+    try {
+      await decideInstructorRequest(id, "approve");
+      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: "approved" } : r)));
+      const req = requests.find((r) => r.id === id);
+      if (req) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.email === req.user_email ? { ...u, role: "instructor", status: "active" } : u
+          )
+        );
+      }
+      setToast({
+        open: true,
+        tone: "success",
+        title: "Request approved",
+        description: "The user can now access instructor features.",
+      });
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "Failed to approve";
+      setToast({ open: true, tone: "error", title: "Error", description: msg });
     }
-    setToast({
-      open: true,
-      tone: "success",
-      title: "Request approved",
-      description: "The user can now access instructor features.",
-    });
   }
 
-  function rejectReq(id: string) {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: "rejected" as RequestStatus } : r))
-    );
-    setToast({
-      open: true,
-      tone: "error",
-      title: "Request rejected",
-      description: "The user remains a student.",
-    });
+  async function rejectReq(id: number) {
+    try {
+      await decideInstructorRequest(id, "reject");
+      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: "rejected" } : r)));
+      setToast({
+        open: true,
+        tone: "error",
+        title: "Request rejected",
+        description: "The user remains a student.",
+      });
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "Failed to reject";
+      setToast({ open: true, tone: "error", title: "Error", description: msg });
+    }
   }
 
   function changeUserRole(id: string, role: UserRow["role"]) {
@@ -277,10 +276,23 @@ export default function AdminDashboard() {
               </div>
 
               <div className="mt-4 space-y-3">
-                {requests
-                  .slice()
-                  .sort((a, b) => b.submittedAt - a.submittedAt)
-                  .map((r) => (
+                {reqError && (
+                  <div className="rounded-md border border-rose-700/40 bg-rose-900/20 px-3 py-2 text-sm text-rose-200">
+                    {reqError}
+                  </div>
+                )}
+                {loading ? (
+                  <div className="text-sm text-slate-300">Loading requests...</div>
+                ) : requests.length === 0 ? (
+                  <div className="text-sm text-slate-400">No requests.</div>
+                ) : (
+                  requests
+                    .slice()
+                    .sort(
+                      (a, b) =>
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+                    )
+                    .map((r) => (
                     <div
                       key={r.id}
                       className="rounded-xl border border-slate-800 bg-slate-900/50 p-4"
@@ -288,25 +300,36 @@ export default function AdminDashboard() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <div className="font-semibold">
-                            {r.studentName}{" "}
-                            <span className="text-slate-400 font-normal">({r.email})</span>
+                            {r.user_email ?? `User #${r.user_id}`}
                           </div>
-                          <div className="text-sm text-slate-300">{r.university}</div>
+                          {r.note && <div className="text-sm text-slate-300">{r.note}</div>}
                           <div className="text-xs text-slate-500">
-                            Submitted: {new Date(r.submittedAt).toLocaleString()}
+                            Submitted: {new Date(r.created_at).toLocaleString()}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <a
                             className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800/60"
-                            href={r.proofUrl}
+                            href={`/admin/requests/${r.id}`}
                             target="_blank"
                             rel="noreferrer"
-                            aria-label={`Open proof for ${r.studentName}`}
+                            aria-label={`Open details for ${r.user_email ?? r.user_id}`}
                           >
-                            <ExternalLink className="h-4 w-4" />
-                            Proof
+                            <ArrowUpRight className="h-4 w-4" />
+                            Open
                           </a>
+                          {r.file_path && (
+                            <a
+                              className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800/60"
+                              href={r.file_path.startsWith("http") ? r.file_path : `${AUTH_BASE_URL}${r.file_path}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Open proof for ${r.user_email ?? r.user_id}`}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Proof
+                            </a>
+                          )}
 
                           {r.status === "pending" ? (
                             <>
@@ -332,9 +355,7 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
-                  ))}
-                {requests.length === 0 && (
-                  <div className="text-sm text-slate-400">No requests.</div>
+                    ))
                 )}
               </div>
             </section>

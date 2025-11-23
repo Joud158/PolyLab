@@ -10,9 +10,12 @@ import RequestInstructor from "./pages/RequestInstructor";
 import InstructorDashboard from "./pages/instructor/InstructorDashboard";
 import ClassroomsList from "./pages/instructor/ClassroomsList";
 import ClassroomDetail from "./pages/instructor/ClassroomDetail";
+import AssignmentDetail from "./pages/instructor/AssignmentDetail";
+import StudentClassroom from "./pages/StudentClassroom";
 import VerifyEmail from "@/pages/VerifyEmail";
 import ForgotPassword from "@/pages/ForgotPassword";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminRequestDetail from "./pages/admin/AdminRequestDetail";
 import PageGallery from "./pages/PageGallery";
 import { DocsPage, ExamplesPage, SecurityPage, TutorialsPage } from "./pages/InfoPages";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -56,6 +59,14 @@ export default function App() {
             }
           />
           <Route
+            path="/student/classrooms/:classId"
+            element={
+              <RoleRoute allow={["student", "instructor", "admin"]}>
+                <StudentClassroom />
+              </RoleRoute>
+            }
+          />
+          <Route
             path="/instructor/request"
             element={
               <RoleRoute allow={["student", "instructor", "admin"]}>
@@ -89,6 +100,14 @@ export default function App() {
               </RoleRoute>
             }
           />
+          <Route
+            path="/instructor/assignments/:assignmentId"
+            element={
+              <RoleRoute allow={["instructor", "admin"]}>
+                <AssignmentDetail />
+              </RoleRoute>
+            }
+          />
 
 
           <Route
@@ -96,6 +115,14 @@ export default function App() {
             element={
               <RoleRoute allow={["admin"]}>
                 <AdminDashboard />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/admin/requests/:requestId"
+            element={
+              <RoleRoute allow={["admin"]}>
+                <AdminRequestDetail />
               </RoleRoute>
             }
           />

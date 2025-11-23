@@ -130,6 +130,7 @@ class Assignment(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
+    attachment_url = Column(String, nullable=True)
     classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=False)
     due_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -151,3 +152,15 @@ class Submission(Base):
     assignment = relationship("Assignment", back_populates="submissions")
     user = relationship("User", back_populates="submissions")
 
+
+class Material(Base):
+    __tablename__ = "materials"
+
+    id = Column(Integer, primary_key=True, index=True)
+    classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    file_url = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    classroom = relationship("Classroom")

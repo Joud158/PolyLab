@@ -59,6 +59,7 @@ class InstructorRequestOut(OrmBase):
 
 
 class InstructorRequestAdminOut(InstructorRequestOut):
+    user_email: Optional[EmailStr] = None
     decision_by: Optional[int] = None
     decided_at: Optional[datetime] = None
 
@@ -68,6 +69,7 @@ class AssignmentBase(BaseModel):
     description: Optional[str] = None
     classroom_id: int
     due_date: Optional[datetime] = None
+    attachment_url: Optional[str] = None
 
 
 class AssignmentCreate(AssignmentBase):
@@ -77,6 +79,12 @@ class AssignmentCreate(AssignmentBase):
 class AssignmentOut(AssignmentBase, OrmBase):
     id: int
     created_at: datetime
+
+
+class AssignmentTemplate(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = None
 
 
 class QuizBase(BaseModel):
@@ -105,6 +113,26 @@ class SubmissionOut(SubmissionCreate, OrmBase):
     user_id: int
     grade: Optional[float]
     submitted_at: datetime
+
+
+class SubmissionWithUser(SubmissionOut):
+    user_email: EmailStr
+
+
+class MaterialBase(BaseModel):
+    classroom_id: int
+    title: str
+    description: Optional[str] = None
+    file_url: Optional[str] = None
+
+
+class MaterialCreate(MaterialBase):
+    pass
+
+
+class MaterialOut(MaterialBase, OrmBase):
+    id: int
+    created_at: datetime
 
 
 class MFAEnrollOut(BaseModel):

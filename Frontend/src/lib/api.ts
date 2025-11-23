@@ -1,4 +1,4 @@
-// Central API client for Auth service (FastAPI backend)
+// Central API client for Auth/Classroom service (FastAPI backend)
 // Handles base URL resolution, credentials, CSRF tokens, and typed helpers.
 
 export const AUTH_BASE_URL =
@@ -15,17 +15,62 @@ export class ApiError extends Error {
   data: unknown;
 
   constructor(status: number, data: unknown) {
-    const message =
-      typeof data === "string"
-        ? data
-        : typeof data === "object" && data && "detail" in data
-        ? String((data as any).detail)
-        : `API request failed with status ${status}`;
+    const message = formatErrorMessage(status, data);
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.data = data;
   }
+}
+
+function formatErrorMessage(status: number, data: unknown): string {
+  const detail = extractDetail(data);
+  if (detail) return detail;
+
+  if (typeof data === "string") return data;
+  if (Array.isArray(data)) {
+    const merged = data.map(extractDetail).filter(Boolean).join("; ");
+    if (merged) return merged;
+  }
+
+  if (data && typeof data === "object") {
+    try {
+      return JSON.stringify(data);
+    } catch {
+      /* ignore and fall through */
+    }
+  }
+
+  return `API request failed with status ${status}`;
+}
+
+function extractDetail(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return null;
+
+  const detail = (value as any).detail ?? value;
+
+  if (typeof detail === "string") return detail;
+
+  if (Array.isArray(detail)) {
+    const msgs = detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          return (item as any).msg ?? (item as any).detail ?? JSON.stringify(item);
+        }
+        return null;
+      })
+      .filter(Boolean);
+    if (msgs.length) return msgs.join("; ");
+  }
+
+  if (detail && typeof detail === "object") {
+    const msg = (detail as any).msg ?? (detail as any).detail;
+    if (typeof msg === "string") return msg;
+  }
+
+  return null;
 }
 
 type RequestOptions = Omit<RequestInit, "body" | "headers"> & {
@@ -177,6 +222,41 @@ export type Classroom = {
   created_at: string;
 };
 
+export type Assignment = {
+  id: number;
+  title: string;
+  description?: string | null;
+  classroom_id: number;
+  due_date?: string | null;
+  attachment_url?: string | null;
+  created_at: string;
+};
+
+export type Material = {
+  id: number;
+  classroom_id: number;
+  title: string;
+  description?: string | null;
+  file_url?: string | null;
+  created_at: string;
+};
+
+export type AssignmentTemplate = {
+  id: string;
+  title: string;
+  description?: string | null;
+};
+
+export type Submission = {
+  id: number;
+  user_id: number;
+  user_email?: string;
+  assignment_id: number;
+  content: string;
+  grade?: number | null;
+  submitted_at: string;
+};
+
 export type InstructorRequest = {
   id: number;
   user_id: number;
@@ -253,6 +333,112 @@ export async function joinClassroom(code: string): Promise<BasicOk> {
   });
 }
 
+// --- Assignments ---
+
+type AssignmentCreatePayload = {
+  title: string;
+  description?: string | null;
+  classroom_id: number;
+  due_date?: string | null;
+};
+
+export async function listAssignments(classroomId: number | string): Promise<Assignment[]> {
+  return request(`/assignments/classroom/${classroomId}`, { method: "GET" });
+}
+
+export async function getAssignment(assignmentId: number | string): Promise<Assignment> {
+  return request(`/assignments/${assignmentId}`, { method: "GET" });
+}
+
+export async function createAssignment(payload: AssignmentCreatePayload): Promise<Assignment> {
+  return request("/assignments", {
+    method: "POST",
+    json: payload,
+  });
+}
+
+export async function listAssignmentTemplates(): Promise<AssignmentTemplate[]> {
+  return request("/assignments/templates", { method: "GET" });
+}
+
+export async function uploadAssignmentAttachment(
+  assignmentId: number,
+  file: File,
+): Promise<Assignment> {
+  const form = new FormData();
+  form.append("file", file);
+  return request(`/assignments/${assignmentId}/attachment`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function submitAssignment(
+  assignmentId: number,
+  content: string,
+): Promise<Submission> {
+  return request("/submissions", {
+    method: "POST",
+    json: { assignment_id: assignmentId, content },
+  });
+}
+
+export async function uploadAssignmentFile(
+  assignmentId: number,
+  file: File,
+): Promise<Submission> {
+  const form = new FormData();
+  form.append("file", file);
+  return request(`/submissions/${assignmentId}/upload`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function listSubmissionsForAssignment(
+  assignmentId: number,
+): Promise<Submission[]> {
+  return request(`/submissions/assignment/${assignmentId}`, { method: "GET" });
+}
+
+export async function listSubmissionsForClassroom(
+  classroomId: number | string,
+): Promise<Submission[]> {
+  return request(`/submissions/classroom/${classroomId}`, { method: "GET" });
+}
+
+export async function listMaterials(classroomId: number | string): Promise<Material[]> {
+  return request(`/materials/classroom/${classroomId}`, { method: "GET" });
+}
+
+export async function createMaterial(payload: {
+  classroom_id: number;
+  title: string;
+  description?: string | null;
+  file_url?: string | null;
+}): Promise<Material> {
+  return request("/materials", {
+    method: "POST",
+    json: payload,
+  });
+}
+
+export async function uploadMaterialFile(materialId: number, file: File): Promise<Material> {
+  const form = new FormData();
+  form.append("file", file);
+  return request(`/materials/${materialId}/upload`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function gradeSubmission(submissionId: number, grade: number): Promise<BasicOk> {
+  const qs = new URLSearchParams({ grade: String(grade) });
+  return request(`/submissions/${submissionId}/grade?${qs.toString()}`, { method: "POST" });
+}
+
+// --- Instructor requests ---
+
 export async function submitInstructorRequest(
   file: File,
   note?: string,
@@ -273,6 +459,14 @@ export async function listInstructorRequests(
   return request(`/admin/roles/requests${qs}`, { method: "GET" });
 }
 
+export async function decideInstructorRequest(id: number, action: "approve" | "reject"): Promise<BasicOk> {
+  return request(`/admin/roles/requests/${id}/${action}`, { method: "POST" });
+}
+
+export async function getInstructorRequest(id: number): Promise<InstructorRequest> {
+  return request(`/admin/roles/requests/${id}`, { method: "GET" });
+}
+
 export const api = {
   signup,
   login,
@@ -281,9 +475,24 @@ export const api = {
   confirmPasswordReset,
   verifyEmail,
   getProfile,
-  submitInstructorRequest,
-  listInstructorRequests,
   listClassrooms,
   createClassroom,
   joinClassroom,
+  listAssignments,
+  getAssignment,
+  createAssignment,
+  listAssignmentTemplates,
+  uploadAssignmentAttachment,
+  submitAssignment,
+  uploadAssignmentFile,
+  listSubmissionsForAssignment,
+  listSubmissionsForClassroom,
+  listMaterials,
+  createMaterial,
+  uploadMaterialFile,
+  gradeSubmission,
+  decideInstructorRequest,
+  getInstructorRequest,
+  submitInstructorRequest,
+  listInstructorRequests,
 };

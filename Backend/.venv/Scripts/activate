@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\ayaae\OneDrive - American University of Beirut\Desktop\hello\PolyLab-Polynomial-Arithmetic\Backend\.venv"
+VIRTUAL_ENV="C:\Users\ayaae\Documents\GitHub\PolyLab-Polynomial-Arithmetic\Backend\.venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

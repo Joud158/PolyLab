@@ -1,11 +1,14 @@
 from datetime import datetime
+from pathlib import Path
+import re
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
 from ..deps import get_current_user, require_instructor
+from ..core.config import settings
 
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
 
@@ -55,6 +58,110 @@ def create_submission(
     return submission
 
 
+@router.get("/assignment/{assignment_id}", response_model=list[schemas.SubmissionWithUser])
+def list_submissions_for_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    assignment = _get_assignment(db, assignment_id)
+    classroom = assignment.classroom
+    if user.role == models.UserRole.admin or classroom.instructor_id == user.id:
+        submissions = (
+            db.query(models.Submission)
+            .filter(models.Submission.assignment_id == assignment_id)
+            .order_by(models.Submission.user_id, models.Submission.submitted_at.desc(), models.Submission.id.desc())
+            .all()
+        )
+        latest: dict[int, models.Submission] = {}
+        for sub in submissions:
+            if sub.user_id not in latest:
+                latest[sub.user_id] = sub
+        return [
+            schemas.SubmissionWithUser(
+                **schemas.SubmissionOut.model_validate(sub, from_attributes=True).model_dump(),
+                user_email=sub.user.email,
+            )
+            for sub in latest.values()
+        ]
+    _ensure_membership(db, assignment.classroom_id, user, allow_instructor=False)
+    submissions = (
+        db.query(models.Submission)
+        .filter_by(assignment_id=assignment_id, user_id=user.id)
+        .order_by(models.Submission.submitted_at.desc())
+        .all()
+    )
+    return [
+        schemas.SubmissionWithUser(
+            **schemas.SubmissionOut.model_validate(sub, from_attributes=True).model_dump(),
+            user_email=sub.user.email,
+        )
+        for sub in submissions
+    ]
+
+
+@router.get("/classroom/{classroom_id}", response_model=list[schemas.SubmissionWithUser])
+def list_submissions_for_classroom(
+    classroom_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_instructor),
+):
+    _ensure_membership(db, classroom_id, user)
+    submissions = (
+        db.query(models.Submission)
+        .join(models.Assignment, models.Submission.assignment_id == models.Assignment.id)
+        .filter(models.Assignment.classroom_id == classroom_id)
+        .order_by(
+            models.Submission.assignment_id,
+            models.Submission.user_id,
+            models.Submission.submitted_at.desc(),
+            models.Submission.id.desc(),
+        )
+        .all()
+    )
+    latest: dict[tuple[int, int], models.Submission] = {}
+    for sub in submissions:
+        key = (sub.assignment_id, sub.user_id)
+        if key not in latest:
+            latest[key] = sub
+    return [
+        schemas.SubmissionWithUser(
+            **schemas.SubmissionOut.model_validate(sub, from_attributes=True).model_dump(),
+            user_email=sub.user.email,
+        )
+        for sub in latest.values()
+    ]
+
+
+@router.post("/{assignment_id}/upload", response_model=schemas.SubmissionOut)
+async def upload_submission_file(
+    assignment_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    assignment = _get_assignment(db, assignment_id)
+    _ensure_membership(db, assignment.classroom_id, user)
+
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", file.filename or "upload.bin")
+    base_dir = Path(settings.UPLOAD_DIR) / "submissions" / f"assignment_{assignment_id}"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    dest = base_dir / f"user{user.id}_{int(datetime.utcnow().timestamp())}_{safe_name}"
+
+    content = await file.read()
+    dest.write_bytes(content)
+
+    submission = models.Submission(
+        user_id=user.id,
+        assignment_id=assignment.id,
+        content=str(dest),
+    )
+    db.add(submission)
+    db.commit()
+    db.refresh(submission)
+    return submission
+
+
 @router.post("/{submission_id}/grade")
 def grade_submission(
     submission_id: int,
@@ -76,4 +183,3 @@ def grade_submission(
     db.commit()
     db.refresh(submission)
     return {"ok": True, "grade": submission.grade}
-

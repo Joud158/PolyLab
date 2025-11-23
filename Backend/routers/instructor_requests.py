@@ -34,14 +34,17 @@ def submit_request(
         raise HTTPException(status_code=400, detail="Empty file")
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (10MB max)")
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    proof_dir = UPLOAD_DIR / "proofs"
+    proof_dir.mkdir(parents=True, exist_ok=True)
     ext = Path(file.filename).suffix or ".bin"
-    dest = UPLOAD_DIR / f"{uuid.uuid4()}{ext}"
+    filename = f"{uuid.uuid4()}{ext}"
+    dest = proof_dir / filename
     dest.write_bytes(data)
+    file_url = f"/uploads/proofs/{filename}"
     request_obj = InstructorRequest(
         user_id=user.id,
         note=note,
-        file_path=str(dest),
+        file_path=file_url,
         status="pending",
     )
     db.add(request_obj)
@@ -59,10 +62,55 @@ def list_requests(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    query = db.query(InstructorRequest)
+    query = db.query(InstructorRequest).join(User, InstructorRequest.user_id == User.id)
     if status in {"pending", "approved", "rejected"}:
         query = query.filter(InstructorRequest.status == status)
-    return query.order_by(InstructorRequest.created_at.desc()).all()
+    results = query.order_by(InstructorRequest.created_at.desc()).all()
+    output: list[InstructorRequestAdminOut] = []
+    for req in results:
+        obj = InstructorRequestAdminOut(
+            id=req.id,
+            status=req.status,
+            note=req.note,
+            file_path=req.file_path,
+            user_id=req.user_id,
+            created_at=req.created_at,
+            decision_by=req.decision_by,
+            decided_at=req.decided_at,
+            user_email=req.user.email if req.user else None,
+        )
+        output.append(obj)
+    return output
+
+
+@router.get(
+    "/admin/roles/requests/{request_id}",
+    response_model=InstructorRequestAdminOut,
+)
+def get_request(
+    request_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    req = (
+        db.query(InstructorRequest)
+        .join(User, InstructorRequest.user_id == User.id)
+        .filter(InstructorRequest.id == request_id)
+        .first()
+    )
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    return InstructorRequestAdminOut(
+        id=req.id,
+        status=req.status,
+        note=req.note,
+        file_path=req.file_path,
+        user_id=req.user_id,
+        created_at=req.created_at,
+        decision_by=req.decision_by,
+        decided_at=req.decided_at,
+        user_email=req.user.email if req.user else None,
+    )
 
 
 @router.post(
@@ -107,4 +155,3 @@ def reject_request(
     db.add(req)
     db.commit()
     return {"ok": True}
-

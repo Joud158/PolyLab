@@ -7,6 +7,7 @@ if __package__ is None or __package__ == "":
     __package__ = "Backend"
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import settings
@@ -19,6 +20,7 @@ from .routers import (
     assignment,
     auth,
     classrooms,
+    materials,
     instructor_requests,
     me,
     mfa,
@@ -38,6 +40,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(SecurityHeadersMiddleware)
+# Serve uploaded files (assignments/submissions)
+Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
 @app.middleware("http")
@@ -57,6 +62,9 @@ async def _csrf(request, call_next):
         or path.startswith("/auth/verify-email")
         or path.startswith("/auth/reset")
         or path.startswith("/classrooms")
+        or path.startswith("/assignments")
+        or path.startswith("/submissions")
+        or path.startswith("/materials")
         or path.startswith("/admin")
         or path.startswith("/roles/requests")
     ):
@@ -79,6 +87,7 @@ app.include_router(me.router)
 app.include_router(instructor_requests.router)
 app.include_router(classrooms.router)
 app.include_router(assignment.router)
+app.include_router(materials.router)
 app.include_router(quiz.router)
 app.include_router(submission.router)
 app.include_router(admin.router)
