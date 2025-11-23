@@ -18,12 +18,12 @@ PolyLab Frontend
    ```
    VITE_API_BASE_URL_AUTH=http://localhost:8000
    ```
-   Change the URL if your backend runs elsewhere.
+   Keep the host consistent with the backend to avoid CSRF/cookie issues.
 3. Start the dev server  
    ```bash
-   npm run dev
+   npm run dev -- --host 0.0.0.0 --port 5173
    ```
-   Vite serves the app on http://localhost:5173 and forwards API calls to the Auth service.
+   App runs on http://localhost:5173 (or your host) and calls the API at `VITE_API_BASE_URL_AUTH`.
 
 ## Tech stack
 

@@ -72,7 +72,7 @@ function Hero() {
           </motion.h1>
 
           <p className="mt-4 text-lg text-slate-300 max-w-xl">
-            Explore, compute, and visualize arithmetic in GF(2^m) (m = 2â€¦8). Learn core
+            Explore, compute, and visualize arithmetic in GF(2^m) (m = 2--8). Learn core
             operations, study animated steps, and practice cryptography-grade math on the web.
           </p>
 
@@ -99,22 +99,7 @@ function Hero() {
             <span className="font-mono text-slate-200">Result = 0xFE</span>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-6 text-slate-400 text-sm">
-                    <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-md bg-gradient-to-br from-cyan-500 to-blue-600 grid place-items-center text-slate-900">
-            P
-          </div>
-          <span className="font-semibold text-slate-200">PolyLab</span>
-          <span>© {new Date().getFullYear()}</span>
-        </div>
-                    <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-md bg-gradient-to-br from-cyan-500 to-blue-600 grid place-items-center text-slate-900">
-            P
-          </div>
-          <span className="font-semibold text-slate-200">PolyLab</span>
-          <span>© {new Date().getFullYear()}</span>
-        </div>
-          </div>
+                   
         </div>
 
         <motion.div
@@ -215,7 +200,7 @@ function LiveDemoSection() {
           <div className="bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 text-white flex items-center gap-2 rounded-t-2xl">
             <Calculator className="h-5 w-5" />
             <span className="font-medium">
-              GF(2^8) Calculator â€¢ AES poly x^8 + x^4 + x^3 + x + 1 (0x11B)
+              GF(2^8) Calculator (trial only basic features): AES poly x^8 + x^4 + x^3 + x + 1 (0x11B)
             </span>
           </div>
           <CardContent className="p-6">

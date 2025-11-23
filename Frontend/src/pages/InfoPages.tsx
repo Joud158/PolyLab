@@ -27,14 +27,14 @@ const meta: Record<InfoVariant, InfoMeta> = {
         title: "Getting Started",
         items: [
           "Backend: uvicorn Backend.main:app --reload --host 0.0.0.0 --port 8000 (env from repo .env; SQLite by default).",
-          "Frontend: npm install && npm run dev from Frontend/ with VITE_API_BASE_URL_AUTH set (default http://localhost:5173).",
+          "Frontend: npm install && npm run dev -- --host 0.0.0.0 --port 5173 with VITE_API_BASE_URL_AUTH=http://localhost:8000.",
           "OpenAPI/Swagger: http://localhost:8000/docs, health check: /health, uploads served at /uploads.",
         ],
       },
       {
         title: "Auth & Sessions",
         items: [
-          "Signup, email verification, login, logout, password reset.",
+          "Signup, email verification, login, logout, password reset, MFA TOTP (enroll/verify/disable).",
           "Password policy: min 8 chars, upper/lower/digit/symbol required.",
         ],
       },
@@ -65,6 +65,7 @@ const meta: Record<InfoVariant, InfoMeta> = {
           "1) Sign up with a strong password.",
           "2) Open the verification link from email and confirm.",
           "3) If want to reset password: request link, receive link by email, set a new password, log back in.",
+          "4) Optional: enable MFA (scan QR, enter 6-digit code, then login will require it).",
         ],
       },
       {
@@ -83,6 +84,7 @@ const meta: Record<InfoVariant, InfoMeta> = {
           "2) Create a classroom; copy the join code and share it.",
           "3) Create an assignment (add attachment if needed) and a material.",
           "4) After students submit, open the assignment, review submissions, and post grades.",
+          "5) Optional: enable MFA (scan QR, enter 6-digit code) to protect instructor access.",
         ],
       },
     ],
@@ -96,7 +98,8 @@ const meta: Record<InfoVariant, InfoMeta> = {
         items: [
           "Get CSRF (optional before session): GET /auth/csrf.",
           "Login: POST /auth/login with JSON {email, password} (include TOTP if required).",
-          "Logout: POST /auth/logout (cookie + x-csrf-token when enabled).",
+          "Logout: POST /auth/logout (cookie + x-csrf-token).",
+          "MFA enroll: POST /auth/mfa/totp/enroll; verify: POST /auth/mfa/totp/verify (code + mfa_token); disable: POST /auth/mfa/totp/disable (code).",
         ],
       },
       {
@@ -139,7 +142,7 @@ const meta: Record<InfoVariant, InfoMeta> = {
       {
         title: "CSRF & Rate Limit",
         items: [
-          "csrf_token cookie paired with x-csrf-token header on unsafe methods (logout exempted).",
+          "Double-submit CSRF: csrf_token cookie + x-csrf-token header on unsafe methods (login/signup/reset/verify/logout/csrf exempt).",
           "Basic per-IP rate limiting: settings.RATE_LIMIT_PER_MINUTE within a 60s window.",
         ],
       },

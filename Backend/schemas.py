@@ -27,6 +27,7 @@ class UserOut(OrmBase):
     email: EmailStr
     role: UserRole
     email_verified: bool
+    totp_enabled: bool
 
 
 class BasicOK(BaseModel):

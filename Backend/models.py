@@ -32,7 +32,9 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     email_verified = Column(Boolean, default=False)
     role = Column(Enum(UserRole), default=UserRole.student, nullable=False)
-    totp_secret = Column(String, nullable=True)
+    totp_secret = Column(String, nullable=True)  # active/verified secret
+    pending_totp_secret = Column(String, nullable=True)  # waiting for verification
+    totp_enabled = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

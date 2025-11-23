@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
@@ -62,6 +62,10 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 @router.get("/verify-email", response_class=HTMLResponse)
 def verify_email_page(token: str, db: Session = Depends(get_db)):
     _verify_email_token(token, db)
+    if settings.FRONTEND_ORIGIN:
+        target = f"{settings.FRONTEND_ORIGIN.rstrip('/')}/verify?token={token}&status=verified"
+        return RedirectResponse(target, status_code=307)
+    # Fallback minimal page if no frontend origin is configured
     return """
     <html>
       <head><title>Email verified</title></head>
@@ -80,9 +84,11 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.email_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified")
-    if user.totp_secret:
-        if not payload.totp or not verify_totp(user.totp_secret, payload.totp):
+    if user.totp_enabled and user.totp_secret:
+        if not payload.totp:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="MFA TOTP required")
+        if not verify_totp(user.totp_secret, payload.totp):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid TOTP code")
     sid = create_session(db, user)
     set_session_cookie(response, sid)
     issue_csrf(response)
@@ -107,8 +113,41 @@ def reset_start(email: str, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@router.get("/reset/confirm", response_class=HTMLResponse)
+def reset_confirm_page(token: str):
+    if settings.FRONTEND_ORIGIN:
+        target = f"{settings.FRONTEND_ORIGIN.rstrip('/')}/reset/confirm?token={token}"
+        return RedirectResponse(target, status_code=307)
+    return f"""
+    <html>
+      <head><title>Reset password</title></head>
+      <body style="font-family: system-ui; text-align:center; margin-top:3rem;">
+        <h1>Reset your password</h1>
+        <p>Enter a new password to finish resetting your account.</p>
+        <form method="post" action="/auth/reset/confirm">
+          <input type="hidden" name="token" value="{token}" />
+          <input type="password" name="new_password" placeholder="New password" required
+                 style="padding:0.5rem 0.75rem; width:260px;" />
+          <div style="margin-top:1rem;">
+            <button type="submit" style="padding:0.5rem 1rem;">Update password</button>
+          </div>
+        </form>
+      </body>
+    </html>
+    """
+
+
 @router.post("/reset/confirm", response_model=BasicOK)
-def reset_confirm(token: str, new_password: str, db: Session = Depends(get_db)):
+def reset_confirm(
+    request: Request,
+    token: str | None = Form(default=None),
+    new_password: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+):
+    token = token or request.query_params.get("token")
+    new_password = new_password or request.query_params.get("new_password")
+    if not token or not new_password:
+        raise HTTPException(status_code=400, detail="Token and new_password are required")
     if not password_policy_ok(new_password):
         raise HTTPException(status_code=400, detail="Weak password")
     user = consume_token(db, token, "reset")

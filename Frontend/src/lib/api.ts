@@ -1,12 +1,9 @@
+/// <reference types="vite/client" />
 // Central API client for Auth/Classroom service (FastAPI backend)
 // Handles base URL resolution, credentials, CSRF tokens, and typed helpers.
 
-export const AUTH_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL_AUTH ??
-    (import.meta as any).env?.API_BASE_URL_AUTH ??
-    "/api" ??
-    "http://localhost:8000") as string;
-
+export const AUTH_BASE_URL: string =
+  import.meta.env.VITE_API_BASE_URL_AUTH || "/api";
 const CSRF_COOKIE_NAME = "csrf_token";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -212,6 +209,7 @@ export type UserProfile = {
   email: string;
   role: "student" | "instructor" | "admin";
   email_verified: boolean;
+  totp_enabled?: boolean;
 };
 
 export type Classroom = {
@@ -268,6 +266,12 @@ export type InstructorRequest = {
   decision_by?: number | null;
   decided_at?: string | null;
   user_email?: string | null;
+};
+
+export type MFAEnrollOut = {
+  secret: string;
+  otpauth: string;
+  mfa_token: string;
 };
 
 export async function signup(body: SignupPayload): Promise<BasicOk> {
@@ -472,6 +476,26 @@ export async function getInstructorRequest(id: number): Promise<InstructorReques
   return request(`/admin/roles/requests/${id}`, { method: "GET" });
 }
 
+// --- MFA (TOTP) ---
+
+export async function enrollTotpMfa(): Promise<MFAEnrollOut> {
+  return request("/auth/mfa/totp/enroll", { method: "POST" });
+}
+
+export async function verifyTotpMfa(code: string, mfaToken: string): Promise<BasicOk> {
+  return request("/auth/mfa/totp/verify", {
+    method: "POST",
+    json: { code, mfa_token: mfaToken },
+  });
+}
+
+export async function disableTotpMfa(code: string): Promise<BasicOk> {
+  return request("/auth/mfa/totp/disable", {
+    method: "POST",
+    json: { code },
+  });
+}
+
 export const api = {
   signup,
   login,
@@ -500,4 +524,7 @@ export const api = {
   getInstructorRequest,
   submitInstructorRequest,
   listInstructorRequests,
+  enrollTotpMfa,
+  verifyTotpMfa,
+  disableTotpMfa,
 };

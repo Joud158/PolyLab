@@ -13,7 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .core.csrf import csrf_protect
 from .core.ratelimit import rate_limit
-from .database import Base, engine
+from .core.security import hash_password, password_policy_ok
+from .database import Base, SessionLocal, engine
 from .middleware.security_headers import SecurityHeadersMiddleware
 from .routers import (
     admin,
@@ -27,8 +28,43 @@ from .routers import (
     quiz,
     submission,
 )
+from .models import User, UserRole
 
 Base.metadata.create_all(bind=engine)
+
+
+def ensure_seed_admin() -> None:
+    email = settings.ADMIN_EMAIL
+    password = settings.ADMIN_PASSWORD
+    if not email or not password:
+        return
+    if not password_policy_ok(password):
+        print("[WARN] Seed admin not created: ADMIN_PASSWORD fails password policy")
+        return
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
+            if existing.role != UserRole.admin or not existing.email_verified:
+                existing.role = UserRole.admin
+                existing.email_verified = True
+                db.add(existing)
+                db.commit()
+            return
+        admin_user = User(
+            email=email,
+            password_hash=hash_password(password),
+            role=UserRole.admin,
+            email_verified=True,
+        )
+        db.add(admin_user)
+        db.commit()
+        print(f"[INFO] Seed admin created: {email}")
+    finally:
+        db.close()
+
+
+ensure_seed_admin()
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -61,12 +97,9 @@ async def _csrf(request, call_next):
         or path.startswith("/auth/signup")
         or path.startswith("/auth/verify-email")
         or path.startswith("/auth/reset")
-        or path.startswith("/classrooms")
-        or path.startswith("/assignments")
-        or path.startswith("/submissions")
-        or path.startswith("/materials")
-        or path.startswith("/admin")
-        or path.startswith("/roles/requests")
+        or path.startswith("/auth/logout")
+        
+
     ):
         return await call_next(request)
     try:

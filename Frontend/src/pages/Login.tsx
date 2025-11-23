@@ -117,7 +117,7 @@ export default function Login() {
 
               <div className="mt-6 flex items-center gap-3 text-slate-400 text-sm">
                 <ShieldCheck className="h-4 w-4 text-cyan-400" />
-                <span>OWASP-aligned auth, passkeys, and TOTP support.</span>
+                <span>OWASP-aligned auth and TOTP support.</span>
               </div>
             </div>
 
@@ -234,16 +234,7 @@ export default function Login() {
                   </Button>
                 </form>
 
-                {/* Passkey / WebAuthn */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handlePasskey}
-                  className="mt-3 w-full h-11 gap-2 border-slate-700 text-slate-200 hover:bg-slate-800/60"
-                >
-                  <KeyRound className="h-5 w-5" />
-                  Use Passkey (WebAuthn)
-                </Button>
+
 
                 {/* Divider + link */}
                 <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
@@ -253,7 +244,7 @@ export default function Login() {
                   </Link>
                 </div>
                 <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
-                  <span>Forgot your passworkd?</span>
+                  <span>Forgot your password?</span>
                   <Link to="/forgot" className="text-cyan-300 hover:text-cyan-200">
                     Reset Password
                   </Link>

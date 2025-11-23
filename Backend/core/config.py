@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # Files
     UPLOAD_DIR: str = "./uploads"
 
+    # Seed admin (optional)
+    ADMIN_EMAIL: Optional[EmailStr] = None
+    ADMIN_PASSWORD: Optional[str] = None
+
     # SMTP / email
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587

@@ -7,9 +7,16 @@ import CopyButton from "@/components/ui/CopyButton";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, Users, ExternalLink } from "lucide-react";
 import bgCircuit from "@/assets/background.png"; // your background image
-import { listClassrooms, createClassroom, Classroom } from "@/lib/api";
+import {
+  listClassrooms,
+  createClassroom,
+  Classroom,
+  enrollTotpMfa,
+  verifyTotpMfa,
+  disableTotpMfa,
+  ApiError,
+} from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { ApiError } from "@/lib/api";
 
 export default function InstructorDashboard() {
   const nav = useNavigate();
@@ -19,6 +26,15 @@ export default function InstructorDashboard() {
   const [creating, setCreating] = React.useState(false);
   const [newName, setNewName] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [mfaState, setMfaState] = React.useState<"idle" | "enrolling" | "verifying" | "enabled">(
+    user?.totp_enabled ? "enabled" : "idle",
+  );
+  const [mfaSecret, setMfaSecret] = React.useState<string | null>(null);
+  const [mfaOtpAuth, setMfaOtpAuth] = React.useState<string | null>(null);
+  const [mfaToken, setMfaToken] = React.useState<string | null>(null);
+  const [mfaCode, setMfaCode] = React.useState("");
+  const [mfaError, setMfaError] = React.useState<string | null>(null);
+  const [mfaSuccess, setMfaSuccess] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -37,7 +53,10 @@ export default function InstructorDashboard() {
 
   React.useEffect(() => {
     refresh();
-  }, [refresh]);
+    if (user?.totp_enabled) {
+      setMfaState("enabled");
+    }
+  }, [refresh, user?.totp_enabled]);
 
   async function handleCreate() {
     if (!newName.trim()) return;
@@ -58,6 +77,57 @@ export default function InstructorDashboard() {
   }
 
   const top = classes.slice(0, 3);
+
+  async function startMfaEnroll() {
+    setMfaError(null);
+    setMfaSuccess(null);
+    setMfaState("enrolling");
+    try {
+      const res = await enrollTotpMfa();
+      setMfaSecret(res.secret);
+      setMfaOtpAuth(res.otpauth);
+      setMfaToken(res.mfa_token);
+      setMfaState("verifying");
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "Failed to start MFA setup.";
+      setMfaError(msg);
+      setMfaState(user?.totp_enabled ? "enabled" : "idle");
+    }
+  }
+
+  async function verifyMfa() {
+    if (!mfaToken) return;
+    setMfaError(null);
+    setMfaSuccess(null);
+    try {
+      await verifyTotpMfa(mfaCode.trim(), mfaToken);
+      setMfaState("enabled");
+      setMfaSuccess("MFA enabled. Use your authenticator app for future logins.");
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "Invalid code.";
+      setMfaError(msg);
+    }
+  }
+
+  async function disableMfa() {
+    setMfaError(null);
+    setMfaSuccess(null);
+    if (!mfaCode.trim()) {
+      setMfaError("Enter your current TOTP code to disable.");
+      return;
+    }
+    try {
+      await disableTotpMfa(mfaCode.trim());
+      setMfaState("idle");
+      setMfaSecret(null);
+      setMfaOtpAuth(null);
+      setMfaToken(null);
+      setMfaSuccess("MFA disabled.");
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "Unable to disable MFA.";
+      setMfaError(msg);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -167,6 +237,91 @@ export default function InstructorDashboard() {
           </section>
         </div>
       </main>
+
+      {/* MFA setup */}
+      <section className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pb-10">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 backdrop-blur p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Multi-Factor Authentication (TOTP)</h2>
+              <p className="text-slate-400 text-sm">Add an authenticator app code to your login.</p>
+            </div>
+            <Button
+              onClick={startMfaEnroll}
+              disabled={mfaState === "enrolling" || mfaState === "verifying" || mfaState === "enabled"}
+              className="bg-cyan-500 text-slate-900 hover:bg-cyan-400 disabled:opacity-60"
+            >
+              {mfaState === "enabled" ? "MFA Enabled" : mfaState === "verifying" || mfaState === "enrolling" ? "Continue setup" : "Enable MFA"}
+            </Button>
+          </div>
+
+          {mfaError && (
+            <div className="mt-3 rounded-md border border-rose-700/40 bg-rose-900/20 px-3 py-2 text-sm text-rose-200">
+              {mfaError}
+            </div>
+          )}
+          {mfaSuccess && (
+            <div className="mt-3 rounded-md border border-emerald-600/30 bg-emerald-600/10 px-3 py-2 text-sm text-emerald-200">
+              {mfaSuccess}
+            </div>
+          )}
+
+          {(mfaState === "verifying" || mfaState === "enabled") && (
+            <div className="mt-4 space-y-3">
+              {mfaSecret && (
+                <div className="text-sm text-slate-300 flex items-center gap-2 flex-wrap">
+                  <span>Secret:</span>
+                  <span className="font-mono bg-slate-800/70 px-2 py-1 rounded">{mfaSecret}</span>
+                </div>
+              )}
+              {mfaOtpAuth && (
+                <div className="text-sm text-slate-300 space-y-2">
+                  <div className="break-all">
+                    OTPAuth URL: <span className="font-mono">{mfaOtpAuth}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="border-slate-700 text-slate-200"
+                      onClick={() => navigator.clipboard.writeText(mfaOtpAuth)}
+                    >
+                      Copy URL
+                    </Button>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(mfaOtpAuth)}`}
+                      alt="Scan to add to authenticator"
+                      className="h-32 w-32 rounded-lg border border-slate-800 bg-slate-900/60 p-1"
+                    />
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm text-slate-300 mb-1">Enter 6-digit code</label>
+                <Input
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="h-11 bg-slate-900/70 border-slate-700/70 max-w-xs"
+                  placeholder="123456"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={verifyMfa}
+                  disabled={!mfaToken || mfaCode.length < 6 || mfaState === "enabled"}
+                  className="bg-cyan-500 text-slate-900 hover:bg-cyan-400"
+                >
+                  Verify code
+                </Button>
+                <Button variant="outline" onClick={disableMfa} className="border-slate-700 text-slate-200">
+                  Disable MFA
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
