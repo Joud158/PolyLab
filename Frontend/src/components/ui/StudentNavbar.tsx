@@ -13,7 +13,7 @@ export default function StudentNavbar({ onLogout }: Props) {
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-slate-300">
-          <NavLink to="/student/classes" className="hover:text-white">My Classes</NavLink>
+          <NavLink to="/student" className="hover:text-white">My Classes</NavLink>
           <NavLink to="/calculator" className="hover:text-white">Calculator</NavLink>
           <NavLink to="/docs" className="hover:text-white">Docs</NavLink>
           {/* Always visible here since this navbar is only used in the student area */}

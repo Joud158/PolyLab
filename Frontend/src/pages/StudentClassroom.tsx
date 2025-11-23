@@ -79,6 +79,17 @@ export default function StudentClassroom() {
     loadData();
   }, [loadData]);
 
+  const asgNumberMap = React.useMemo(() => {
+    const sorted = [...assignments].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
+    const map: Record<number, number> = {};
+    sorted.forEach((a, idx) => {
+      map[a.id] = idx + 1;
+    });
+    return map;
+  }, [assignments]);
+
   async function submit(assignmentId: number) {
     const state = drafts[assignmentId] ?? { content: "", file: null, submitting: false };
     if (!state.content.trim() && !state.file) {
@@ -193,7 +204,9 @@ export default function StudentClassroom() {
                     <div key={a.id} className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <div className="text-lg font-semibold">{a.title}</div>
+                          <div className="text-lg font-semibold">
+                            {`Asg ${asgNumberMap[a.id] ?? ""} ${asgNumberMap[a.id] ? ":" : ""} ${a.title}`}
+                          </div>
                           {a.description && <div className="text-sm text-slate-300 whitespace-pre-line mt-1">{a.description}</div>}
                           <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                             <Clock3 className="h-4 w-4" />

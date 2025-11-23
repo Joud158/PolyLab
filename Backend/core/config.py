@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Networking
     FRONTEND_ORIGIN: str = "http://localhost:5173"
-    CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1"]
     HSTS_ENABLED: bool = False
     RATE_LIMIT_PER_MINUTE: int = 120
 
@@ -43,4 +43,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

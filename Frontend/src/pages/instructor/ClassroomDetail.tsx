@@ -40,6 +40,16 @@ export default function ClassroomDetail() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const asgNumberMap = React.useMemo(() => {
+    const sorted = [...assignments].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
+    const map: Record<number, number> = {};
+    sorted.forEach((a, idx) => {
+      map[a.id] = idx + 1;
+    });
+    return map;
+  }, [assignments]);
 
   const loadClasses = useCallback(async () => {
     setLoadingClasses(true);
@@ -194,7 +204,7 @@ export default function ClassroomDetail() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">
-                    Asg {assignments.findIndex((a) => a.id === selectedAssignment.id) + 1}: {selectedAssignment.title}
+                    Asg {asgNumberMap[selectedAssignment.id] ?? selectedAssignment.id}: {selectedAssignment.title}
                   </div>
                   {selectedAssignment.description && (
                     <div className="text-sm text-slate-300 whitespace-pre-line mt-1">
@@ -254,6 +264,16 @@ function AssignmentsPanel({
   onError: (msg: string | null) => void;
   onSelect: (a: Assignment | null) => void;
 }) {
+  const asgNumberMap = React.useMemo(() => {
+    const sorted = [...assignments].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
+    const map: Record<number, number> = {};
+    sorted.forEach((a, idx) => {
+      map[a.id] = idx + 1;
+    });
+    return map;
+  }, [assignments]);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [due, setDue] = useState("");
@@ -389,7 +409,7 @@ function AssignmentsPanel({
               <div className="flex items-start gap-3">
                 <Inbox className="h-5 w-5 text-indigo-400 mt-0.5" />
                 <div>
-                  <div className="font-semibold">{`Asg ${idx + 1}: ${a.title}`}</div>
+                  <div className="font-semibold">{`Asg ${asgNumberMap[a.id] ?? idx + 1}: ${a.title}`}</div>
                   {a.description && <div className="text-sm text-slate-400 whitespace-pre-line">{a.description}</div>}
                   <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
                     <Clock3 className="h-3.5 w-3.5" /> {a.due_date ? `Due ${new Date(a.due_date).toLocaleString()}` : "No due date"}
