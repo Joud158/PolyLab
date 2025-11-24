@@ -78,17 +78,31 @@ function Hero() {
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to="/signup">
-                <Button size="lg" className="gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900">
-                    <Calculator className="h-5 w-5" />
-                    Get Started Free
-                </Button>
-                </Link>
+              <Button
+                size="lg"
+                className="gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900"
+              >
+                <Calculator className="h-5 w-5" />
+                Get Started Free
+              </Button>
+            </Link>
 
-            <Button size="lg" variant="outline" className="gap-2 border-slate-700 text-slate-200">
-              <Play className="h-5 w-5" />
-              Watch Demo
-            </Button>
+            <a
+              href="https://www.youtube.com/watch?v=tLylCZbrl5U"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-slate-700 text-slate-200"
+              >
+                <Play className="h-5 w-5" />
+                Watch Demo
+              </Button>
+            </a>
           </div>
+
 
           <div className="mt-5 inline-flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2">
             <div className="h-7 w-7 rounded-md grid place-items-center bg-slate-800 text-slate-300">
