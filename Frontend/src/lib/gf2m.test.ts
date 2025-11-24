@@ -241,3 +241,4 @@ describe("AES-style golden vector sanity checks in GF(2^8)", () => {
     expect(prod).toBe(1);
   });
 });
+

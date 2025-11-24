@@ -58,15 +58,18 @@ export default function CalculatorPage() {
   const [expN, setExpN] = useState("2");
 
   const cfg: GFConfig = useMemo(() => ({ m, modPoly }), [m, modPoly]);
+  const hexWidth = Math.max(2, Math.ceil(m / 4));
 
-  // normalize hex to field size
-  const maxBytes = Math.ceil(m / 8); // m<=8 ⇒ 1 byte; still keep general form
-  const maxMask = (1 << m) - 1;
-  const normHex = (s: string) => (parseInt(s || "0", 16) & maxMask) >>> 0;
+  // parse hex freely, then reduce into GF(2^m)
+  const parseHex = (s: string) => parseInt(s || "0", 16) >>> 0;
 
-  const aVal = normHex(aHex);
-  const bVal = normHex(bHex);
+  const rawA = parseHex(aHex);
+  const rawB = parseHex(bHex);
   const nVal = Math.max(0, parseInt(expN || "0", 10) || 0);
+
+  // canonical field elements: reduce once mod the irreducible polynomial
+  const aField = gfMod(rawA, cfg).value;
+  const bField = gfMod(rawB, cfg).value;
 
   const steps: Step[] = [];
   let result = 0;
@@ -74,28 +77,38 @@ export default function CalculatorPage() {
   switch (op) {
     case "add":
     case "sub": {
-      result = gfAdd(aVal, bVal);
+      // addition/subtraction = XOR in GF(2^m) on reduced elements
+      result = gfAdd(aField, bField);
+      steps.push({
+        kind: "add",
+        op,
+        a: aField,
+        b: bField,
+        result,
+      });
       break;
     }
     case "mul": {
-      result = gfMul(aVal, bVal, cfg, steps).value;
+      result = gfMul(aField, bField, cfg, steps).value;
       break;
     }
     case "div": {
-      const inv = gfInv(bVal, cfg).value;
-      result = gfMul(aVal, inv, cfg).value;
+      const invRes = gfInv(bField, cfg, steps);
+      const mulRes = gfMul(aField, invRes.value, cfg, steps);
+      result = mulRes.value;
       break;
     }
     case "inv": {
-      result = gfInv(aVal, cfg).value;
+      result = gfInv(aField, cfg, steps).value;
       break;
     }
     case "pow": {
-      result = gfPow(aVal, nVal, cfg).value;
+      result = gfPow(aField, nVal, cfg, steps).value;
       break;
     }
     case "mod": {
-      result = gfMod(aVal, cfg, steps).value;
+      // reduce the raw polynomial to show non-trivial reduction steps
+      result = gfMod(rawA, cfg, steps).value;
       break;
     }
   }
@@ -109,8 +122,8 @@ export default function CalculatorPage() {
       m,
       modPoly,
       op,
-      a: ["add", "sub", "mul", "div", "pow", "mod"].includes(op) ? aVal : undefined,
-      b: ["add", "sub", "mul", "div"].includes(op) ? bVal : undefined,
+      a: ["add", "sub", "mul", "div", "pow", "mod"].includes(op) ? aField : undefined,
+      b: ["add", "sub", "mul", "div"].includes(op) ? bField : undefined,
       n: op === "pow" ? nVal : undefined,
       result,
     });
@@ -187,7 +200,7 @@ export default function CalculatorPage() {
                 className="h-11 bg-slate-900/70 border-slate-700/70"
               />
               <div className="mt-1 text-xs text-slate-400">
-                Polynomial: <span className="font-mono">{asPolyString(modPoly)}</span> • Default AES for m=8 is 0x11B
+                Polynomial: <span className="font-mono">{asPolyString(modPoly)}</span> ? Default AES for m=8 is 0x11B
               </div>
             </div>
 
@@ -224,10 +237,16 @@ export default function CalculatorPage() {
                 <label className="block text-sm text-slate-300 mb-1">Input A (Hex)</label>
                 <Input
                   value={aHex}
-                  onChange={(e) => setAHex(e.target.value.replace(/[^0-9a-fA-F]/g, "").slice(0, 2 * maxBytes))}
+                  onChange={(e) =>
+                    setAHex(
+                      e.target.value
+                        .replace(/[^0-9a-fA-F]/g, "")
+                        .slice(0, 8)
+                    )
+                  }
                   className="h-11 bg-slate-900/70 border-slate-700/70 font-mono"
                 />
-                <div className="mt-1 text-xs text-slate-400">Binary: 0b{aVal.toString(2).padStart(m, "0")}</div>
+                <div className="mt-1 text-xs text-slate-400">Binary: 0b{aField.toString(2).padStart(m, "0")}</div>
               </div>
 
               {/* B */}
@@ -236,10 +255,16 @@ export default function CalculatorPage() {
                   <label className="block text-sm text-slate-300 mb-1">Input B (Hex)</label>
                   <Input
                     value={bHex}
-                    onChange={(e) => setBHex(e.target.value.replace(/[^0-9a-fA-F]/g, "").slice(0, 2 * maxBytes))}
+                    onChange={(e) =>
+                      setBHex(
+                        e.target.value
+                          .replace(/[^0-9a-fA-F]/g, "")
+                          .slice(0, 8)
+                      )
+                    }
                     className="h-11 bg-slate-900/70 border-slate-700/70 font-mono"
                   />
-                  <div className="mt-1 text-xs text-slate-400">Binary: 0b{bVal.toString(2).padStart(m, "0")}</div>
+                  <div className="mt-1 text-xs text-slate-400">Binary: 0b{bField.toString(2).padStart(m, "0")}</div>
                 </div>
               )}
 
@@ -272,14 +297,14 @@ export default function CalculatorPage() {
             <Tabs defaultValue="value" className="w-full">
               <TabsList className="bg-slate-800/60">
                 <TabsTrigger value="value">Value</TabsTrigger>
-                <TabsTrigger value="steps" disabled={["add", "sub"].includes(op)}>Steps</TabsTrigger>
+                <TabsTrigger value="steps">Steps</TabsTrigger>
                 <TabsTrigger value="notes">Notes</TabsTrigger>
               </TabsList>
 
               <TabsContent value="value" className="mt-4">
                 <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
                   <div className="text-5xl font-extrabold tracking-wider text-cyan-300 font-mono">
-                    {hex(result, 2)}
+                    {hex(result, hexWidth)}
                   </div>
                   <div className="mt-3 space-y-1 text-slate-300">
                     <div>Binary: <span className="font-mono">0b{result.toString(2).padStart(m, "0")}</span></div>
@@ -294,12 +319,15 @@ export default function CalculatorPage() {
                   {steps.map((s, i) => (
                     <div key={i} className="font-mono text-slate-300">
                       {s.kind === "mul" && (
-                        <>[i={s.i}] bBit={s.bBit} • A:{hex(s.aBefore)}→{hex(s.aAfter)} • P:{hex(s.pBefore)}→{hex(s.pAfter)}</>
+                        <>[i={s.i}] bBit={s.bBit} ? A:{hex(s.aBefore)}?{hex(s.aAfter)} ? P:{hex(s.pBefore)}?{hex(s.pAfter)}</>
                       )}
-                      {s.kind === "reduce" && <>[reduce] carry={s.carry} • {hex(s.before)}→{hex(s.after)}</>}
-                      {s.kind === "mod" && <>[mod] {hex(s.before)}→{hex(s.after)}</>}
+                      {s.kind === "reduce" && <>[reduce] carry={s.carry} ? {hex(s.before)}?{hex(s.after)}</>}
+                      {s.kind === "mod" && <>[mod] {hex(s.before)}?{hex(s.after)}</>}
+                      {s.kind === "add" && (
+                        <>[add] {s.op.toUpperCase()} {hex(s.a)} + {hex(s.b)} = {hex(s.result)}</>
+                      )}
                       {s.kind === "exp" && (
-                        <>[exp] bit={s.bit} • base:{hex(s.baseBefore)}→{hex(s.baseAfter)} • acc:{hex(s.accBefore)}→{hex(s.accAfter)}</>
+                        <>[exp] bit={s.bit} ? base:{hex(s.baseBefore)}?{hex(s.baseAfter)} ? acc:{hex(s.accBefore)}?{hex(s.accAfter)}</>
                       )}
                       {s.kind === "egcd" && (
                         <>[egcd] u={hex(s.a)} v={hex(s.b)} q={hex(s.q)} r={hex(s.r)} t0={hex(s.t0)} t1={hex(s.t1)}</>
@@ -343,10 +371,10 @@ export default function CalculatorPage() {
                     >
                       <div className="text-slate-300">
                         <div className="font-mono">
-                          Op: {it.op.toUpperCase()}, Field: GF(2^{it.m}), A: {it.a !== undefined ? hex(it.a) : "—"}
-                          {["add", "sub", "mul", "div"].includes(it.op) && <> , B: {it.b !== undefined ? hex(it.b!) : "—"}</>}
+                          Op: {it.op.toUpperCase()}, Field: GF(2^{it.m}), A: {it.a !== undefined ? hex(it.a) : "?"}
+                          {["add", "sub", "mul", "div"].includes(it.op) && <> , B: {it.b !== undefined ? hex(it.b!) : "?"}</>}
                           {it.op === "pow" && <> , N: {it.n}</>}
-                          , Result: {hex(it.result)}
+                          , Result: {hex(it.result, hexWidth)}
                         </div>
                         <div className="text-slate-500">{new Date(it.ts).toLocaleString()}</div>
                       </div>
@@ -364,3 +392,5 @@ export default function CalculatorPage() {
     </div>
   );
 }
+
+

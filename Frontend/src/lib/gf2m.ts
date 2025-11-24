@@ -28,6 +28,13 @@ export type Step =
       after: number;
     }
   | {
+      kind: "add";
+      op: "add" | "sub";
+      a: number;
+      b: number;
+      result: number;
+    }
+  | {
       kind: "exp";
       bit: number;
       baseBefore: number;
@@ -181,9 +188,9 @@ export function gfPow(
       // We'll compute after-values by actually doing the operations,
       // but we must log them *after* they happen.
       if (bit) {
-        acc = gfMul(acc, base, cfg).value;
+        acc = gfMul(acc, base, cfg, steps).value;
       }
-      base = gfMul(base, base, cfg).value;
+      base = gfMul(base, base, cfg, steps).value;
 
       const baseAfter = base;
       const accAfter = acc;
