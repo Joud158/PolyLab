@@ -51,7 +51,14 @@ export default function App() {
           <Route path="/tutorials" element={<TutorialsPage />} />
           <Route path="/examples" element={<ExamplesPage />} />
           <Route path="/security" element={<SecurityPage />} />
-          <Route path="/calculator" element={<CalculatorPage />} />
+          <Route
+            path="/calculator"
+            element={
+              <RoleRoute allow={["student","instructor","admin"]}>
+                <CalculatorPage />
+              </RoleRoute>
+            }
+          />
           <Route
             path="/student"
             element={
