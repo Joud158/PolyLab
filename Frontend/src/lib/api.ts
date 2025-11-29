@@ -2,16 +2,25 @@
 // Central API client for Auth/Classroom service (FastAPI backend)
 // Handles base URL resolution, credentials, CSRF tokens, and typed helpers.
 
-// Normalize base URL: use env if set, otherwise "/api", and strip trailing slashes
-const RAW_AUTH_BASE =
-  (import.meta.env?.VITE_API_BASE_URL_AUTH &&
-    import.meta.env.VITE_API_BASE_URL_AUTH.trim() !== "")
-    ? import.meta.env.VITE_API_BASE_URL_AUTH.trim()
-    : "/api";
+// ---------------- Base URL resolution ----------------
 
-export const AUTH_BASE_URL: string = RAW_AUTH_BASE.replace(/\/+$/, "");
+// Prefer VITE_AUTH_BASE_URL (for production on Render), fall back to
+// VITE_API_BASE_URL_AUTH (old name), then to local dev backend.
+const rawEnvBase =
+  (import.meta.env?.VITE_AUTH_BASE_URL &&
+    import.meta.env.VITE_AUTH_BASE_URL.trim() !== "")
+    ? import.meta.env.VITE_AUTH_BASE_URL.trim()
+    : (import.meta.env?.VITE_API_BASE_URL_AUTH &&
+        import.meta.env.VITE_API_BASE_URL_AUTH.trim() !== "")
+      ? import.meta.env.VITE_API_BASE_URL_AUTH.trim()
+      : "http://localhost:8000/api";
+
+// Normalize: strip trailing slashes
+export const AUTH_BASE_URL: string = rawEnvBase.replace(/\/+$/, "");
 
 console.log("AUTH_BASE_URL =", AUTH_BASE_URL);
+
+// ---------------- Common helpers ----------------
 
 const CSRF_COOKIE_NAME = "csrf_token";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -211,7 +220,7 @@ function tryParseJSON(payload: string): unknown {
   }
 }
 
-// ------- Typed API methods -------
+// ------- Typed API types -------
 
 export type SignupPayload = {
   email: string;
@@ -275,7 +284,7 @@ export type Submission = {
   content: string;
   grade?: number | null;
   submitted_at: string;
-  file_url?: string | null; // <-- kept this
+  file_url?: string | null;
 };
 
 export type InstructorRequest = {
