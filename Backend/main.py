@@ -10,7 +10,7 @@ if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parent.parent))
     __package__ = "Backend"
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,7 +33,6 @@ from .routers import (
     submission,
 )
 from .models import User, UserRole
-
 
 # ---------------------------------------------------------------------------
 # Database schema + seed admin
@@ -90,23 +89,27 @@ ensure_seed_admin()
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title=settings.APP_NAME,
-    docs_url="/docs",            # Swagger UI
-    redoc_url=None,              # disable ReDoc (optional)
-    openapi_url="/openapi.json", # JSON schema
+    docs_url="/docs",             # Swagger UI
+    redoc_url=None,               # disable ReDoc (optional)
+    openapi_url="/openapi.json",  # JSON schema
 )
 
 # ---------------------------------------------------------------------------
 # Middleware: CORS + Security headers
 # ---------------------------------------------------------------------------
+# We hard-code allowed origins so that Render + the deployed frontend work.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[
+        "https://polylab-website.onrender.com",
+        "http://localhost:5173",  # keep local dev working
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ⚠️ Security headers middleware (CSP etc.)
+# Security headers middleware (CSP etc.)
 app.add_middleware(SecurityHeadersMiddleware)
 
 # ---------------------------------------------------------------------------
@@ -116,32 +119,47 @@ app.add_middleware(SecurityHeadersMiddleware)
 Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
-
 # ---------------------------------------------------------------------------
 # Rate limiting middleware
 # ---------------------------------------------------------------------------
 @app.middleware("http")
-async def _rate_limit(request, call_next):
+async def _rate_limit(request: Request, call_next):
     await rate_limit(request)
     return await call_next(request)
-
 
 # ---------------------------------------------------------------------------
 # CSRF middleware
 # ---------------------------------------------------------------------------
+
+# Paths that should be exempt from CSRF (login/signup/reset/etc.)
+CSRF_EXACT_EXEMPT = {
+    "/auth/csrf",
+    "/api/auth/csrf",
+}
+
+CSRF_PREFIX_EXEMPT = [
+    "/auth/login",
+    "/auth/signup",
+    "/auth/verify-email",
+    "/auth/reset",
+    "/auth/logout",
+    "/api/auth/login",
+    "/api/auth/signup",
+    "/api/auth/verify-email",
+    "/api/auth/reset",
+    "/api/auth/logout",
+]
+
+
 @app.middleware("http")
-async def _csrf(request, call_next):
+async def _csrf(request: Request, call_next):
     path = request.url.path
 
     # Safe methods or explicitly exempted routes
     if (
         request.method in ("GET", "HEAD", "OPTIONS")
-        or path.endswith("/auth/csrf")
-        or path.startswith("/auth/login")
-        or path.startswith("/auth/signup")
-        or path.startswith("/auth/verify-email")
-        or path.startswith("/auth/reset")
-        or path.startswith("/auth/logout")
+        or path in CSRF_EXACT_EXEMPT
+        or any(path.startswith(prefix) for prefix in CSRF_PREFIX_EXEMPT)
     ):
         return await call_next(request)
 
@@ -160,21 +178,19 @@ async def _csrf(request, call_next):
 
     return await call_next(request)
 
-
 # ---------------------------------------------------------------------------
-# Routers
+# Routers  (ALL under /api)
 # ---------------------------------------------------------------------------
-app.include_router(auth.router)
-app.include_router(mfa.router)
-app.include_router(me.router)
-app.include_router(instructor_requests.router)
-app.include_router(classrooms.router)
-app.include_router(assignment.router)
-app.include_router(materials.router)
-app.include_router(quiz.router)
-app.include_router(submission.router)
-app.include_router(admin.router)
-
+app.include_router(auth.router, prefix="/api")
+app.include_router(mfa.router, prefix="/api")
+app.include_router(me.router, prefix="/api")
+app.include_router(instructor_requests.router, prefix="/api")
+app.include_router(classrooms.router, prefix="/api")
+app.include_router(assignment.router, prefix="/api")
+app.include_router(materials.router, prefix="/api")
+app.include_router(quiz.router, prefix="/api")
+app.include_router(submission.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 # ---------------------------------------------------------------------------
 # Health / root
@@ -186,4 +202,4 @@ def health():
 
 @app.get("/")
 def read_root():
-    return {"status": "ok"}
+    return {"status": "ok", "docs": "/docs"}
