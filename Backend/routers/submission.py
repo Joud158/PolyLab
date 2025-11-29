@@ -57,27 +57,41 @@ def _as_utc(dt: datetime) -> datetime:
 
 
 def _resolve_file_url(submission: models.Submission) -> str | None:
-    """Derive a downloadable URL for legacy rows where the file path was stored in content."""
+    """
+    Derive a downloadable URL for legacy rows where the file path was stored in content,
+    and return an absolute URL using BACKEND_BASE_URL.
+    """
+    # If already stored as an absolute URL, just return it
     if submission.file_url:
         return submission.file_url
+
     content = (submission.content or "").strip()
     if not content:
         return None
     if "submissions" not in content:
         return None
+
     try:
         path = Path(content)
     except Exception:
         return None
-    # If the stored content was a filesystem path, convert it to the mounted /uploads path.
+
     parts = [p for p in path.parts if p]
+    static_rel: str | None = None
+
     if "uploads" in parts:
+        # e.g. /var/www/uploads/submissions/... -> /uploads/submissions/...
         rel_parts = parts[parts.index("uploads") :]
-        return "/" + "/".join(rel_parts)
-    if parts and parts[0] != "uploads":
+        static_rel = "/" + "/".join(rel_parts)
+    elif parts and parts[0] != "uploads":
         # handle relative paths like "submissions/assignment_1/file.ext"
-        return "/".join(("/uploads", *parts))
-    return None
+        static_rel = "/".join(("/uploads", *parts))
+
+    if not static_rel:
+        return None
+
+    backend_base = settings.BACKEND_BASE_URL.rstrip("/")
+    return f"{backend_base}{static_rel}"
 
 
 @router.post("/", response_model=schemas.SubmissionOut)
@@ -118,7 +132,11 @@ def list_submissions_for_assignment(
         submissions = (
             db.query(models.Submission)
             .filter(models.Submission.assignment_id == assignment_id)
-            .order_by(models.Submission.user_id, models.Submission.submitted_at.desc(), models.Submission.id.desc())
+            .order_by(
+                models.Submission.user_id,
+                models.Submission.submitted_at.desc(),
+                models.Submission.id.desc(),
+            )
             .all()
         )
         latest: dict[int, models.Submission] = {}
@@ -222,7 +240,11 @@ async def upload_submission_file(
     file_bytes = await file.read()
     dest.write_bytes(file_bytes)
 
-    file_url = f"/uploads/submissions/assignment_{assignment_id}/{dest.name}"
+    # Build absolute URL to the uploaded file
+    static_rel = f"/uploads/submissions/assignment_{assignment_id}/{dest.name}"
+    backend_base = settings.BACKEND_BASE_URL.rstrip("/")
+    file_url = f"{backend_base}{static_rel}"
+
     submission_content = content.strip() if content else f"File upload: {safe_name}"
 
     submission = models.Submission(

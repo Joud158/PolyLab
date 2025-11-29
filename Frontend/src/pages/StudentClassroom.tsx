@@ -10,7 +10,6 @@ import {
   Classroom,
   Assignment,
   Submission,
-  AUTH_BASE_URL,
   listClassrooms,
   listAssignments,
   submitAssignment,
@@ -61,7 +60,7 @@ export default function StudentClassroom() {
       setAssignments(data);
       const mats = await listMaterials(classId);
       setMaterials(mats);
-      // fetch submissions per assignment (own submissions)
+
       const subsEntries = await Promise.all(
         data.map(async (a) => {
           try {
@@ -197,6 +196,7 @@ export default function StudentClassroom() {
               <TabsTrigger value="submissions">My Submissions</TabsTrigger>
             </TabsList>
 
+            {/* --------------------- ASSIGNMENTS TAB ------------------------ */}
             <TabsContent value="assignments" className="mt-4 space-y-4">
               {assignments.length === 0 ? (
                 <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-slate-300">
@@ -218,10 +218,12 @@ export default function StudentClassroom() {
                             <Clock3 className="h-4 w-4" />
                             {a.due_date ? `Due ${new Date(a.due_date).toLocaleString()}` : "No due date"}
                           </div>
+
+                          {/* FIXED ATTACHMENT LINK */}
                           {a.attachment_url && (
                             <div className="mt-2">
                               <a
-                                href={`${AUTH_BASE_URL}${a.attachment_url}`}
+                                href={a.attachment_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-sm text-cyan-300 hover:text-cyan-200 underline"
@@ -230,6 +232,8 @@ export default function StudentClassroom() {
                               </a>
                             </div>
                           )}
+
+                          {/* STUDENT SUBMISSION */}
                           {submitted && (
                             <div className="mt-3 space-y-2">
                               <div className="text-xs text-emerald-300">
@@ -254,6 +258,7 @@ export default function StudentClassroom() {
                                   </>
                                 )}
                               </Button>
+
                               {openSubs[submitted.id] && (
                                 <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-100">
                                   {submitted.content && (
@@ -262,9 +267,11 @@ export default function StudentClassroom() {
                                       <pre className="whitespace-pre-wrap text-slate-100">{submitted.content}</pre>
                                     </div>
                                   )}
+
+                                  {/* FIXED SUBMITTED FILE LINK */}
                                   {submitted.file_url && (
                                     <a
-                                      href={`${AUTH_BASE_URL}${submitted.file_url}`}
+                                      href={submitted.file_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
@@ -279,6 +286,7 @@ export default function StudentClassroom() {
                         </div>
                       </div>
 
+                      {/* SUBMIT FORM */}
                       <div className="space-y-2">
                         <label className="text-sm text-slate-300">Submit your work</label>
                         <textarea
@@ -326,6 +334,7 @@ export default function StudentClassroom() {
               )}
             </TabsContent>
 
+            {/* ---------------- MATERIALS TAB ---------------- */}
             <TabsContent value="materials" className="mt-4">
               <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
                 {materials.length === 0 ? (
@@ -336,9 +345,11 @@ export default function StudentClassroom() {
                       <div className="flex-1">
                         <div className="font-semibold text-slate-100">{m.title}</div>
                         {m.description && <div className="text-sm text-slate-400">{m.description}</div>}
+
+                        {/* FIXED MATERIALS LINK */}
                         {m.file_url && (
                           <a
-                            href={`${AUTH_BASE_URL}${m.file_url}`}
+                            href={m.file_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-1 inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
@@ -353,6 +364,7 @@ export default function StudentClassroom() {
               </div>
             </TabsContent>
 
+            {/* ---------------- STUDENT SUBMISSIONS TAB ---------------- */}
             <TabsContent value="submissions" className="mt-4">
               <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
                 {submittedCount === 0 ? (
@@ -386,6 +398,7 @@ export default function StudentClassroom() {
                               )}
                             </Button>
                           </div>
+
                           {openSubs[s.id] && (
                             <div className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-200">
                               {s.content && (
@@ -394,9 +407,11 @@ export default function StudentClassroom() {
                                   <pre className="whitespace-pre-wrap text-slate-100">{s.content}</pre>
                                 </div>
                               )}
+
+                              {/* FIXED DOWNLOAD LINK */}
                               {s.file_url && (
                                 <a
-                                  href={`${AUTH_BASE_URL}${s.file_url}`}
+                                  href={s.file_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 text-xs"

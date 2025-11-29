@@ -67,13 +67,27 @@ def _ensure_membership(db: Session, classroom_id: int, user: models.User):
 
 
 def _store_attachment(assignment_id: int, filename: str, content: bytes) -> str:
+    """
+    Store the attachment on disk and return a public URL.
+
+    Files are served from the /uploads static mount in main.py, so we build:
+      https://polylab.onrender.com/uploads/assignments/assignment_{id}/filename
+    using BACKEND_BASE_URL.
+    """
     base_dir = Path(settings.UPLOAD_DIR) / "assignments" / f"assignment_{assignment_id}"
     base_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = "".join(ch if ch.isalnum() or ch in ("-", "_", ".", " ") else "_" for ch in (filename or "assignment.pdf"))
+
+    safe_name = "".join(
+        ch if ch.isalnum() or ch in ("-", "_", ".", " ") else "_"
+        for ch in (filename or "assignment.pdf")
+    )
     dest = base_dir / safe_name
     dest.write_bytes(content)
-    # Return URL path relative to static mount
-    return f"/uploads/assignments/assignment_{assignment_id}/{safe_name}"
+
+    # Static path under the /uploads mount
+    static_rel = f"/uploads/assignments/assignment_{assignment_id}/{safe_name}"
+    backend_base = settings.BACKEND_BASE_URL.rstrip("/")
+    return f"{backend_base}{static_rel}"
 
 
 def _ensure_attachment_column(db: Session) -> None:
@@ -140,8 +154,13 @@ async def upload_assignment_attachment(
     _ensure_attachment_column(db)
     assignment = _get_assignment(db, assignment_id)
     _ensure_can_manage(assignment.classroom, user)
+
     content = await file.read()
-    attachment_url = _store_attachment(assignment_id, file.filename or "assignment.pdf", content)
+    attachment_url = _store_attachment(
+        assignment_id,
+        file.filename or "assignment.pdf",
+        content,
+    )
     assignment.attachment_url = attachment_url
     db.add(assignment)
     db.commit()
