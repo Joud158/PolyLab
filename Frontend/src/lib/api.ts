@@ -2,11 +2,14 @@
 // Central API client for Auth/Classroom service (FastAPI backend)
 // Handles base URL resolution, credentials, CSRF tokens, and typed helpers.
 
-export const AUTH_BASE_URL: string =
+// Normalize base URL: use env if set, otherwise "/api", and strip trailing slashes
+const RAW_AUTH_BASE =
   (import.meta.env?.VITE_API_BASE_URL_AUTH &&
     import.meta.env.VITE_API_BASE_URL_AUTH.trim() !== "")
-    ? import.meta.env.VITE_API_BASE_URL_AUTH
+    ? import.meta.env.VITE_API_BASE_URL_AUTH.trim()
     : "/api";
+
+export const AUTH_BASE_URL: string = RAW_AUTH_BASE.replace(/\/+$/, "");
 
 console.log("AUTH_BASE_URL =", AUTH_BASE_URL);
 
@@ -84,6 +87,14 @@ type RequestOptions = Omit<RequestInit, "body" | "headers"> & {
   skipCsrf?: boolean;
 };
 
+// Build a clean URL without double slashes
+function buildUrl(path: string): string {
+  const base = AUTH_BASE_URL.replace(/\/+$/, "");
+  if (!path) return base;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath}`;
+}
+
 async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers ?? {});
@@ -117,7 +128,7 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${AUTH_BASE_URL}${path}`, finalInit);
+    res = await fetch(buildUrl(path), finalInit);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Network error";
     throw new ApiError(
@@ -171,7 +182,7 @@ export async function prefetchCsrfToken(): Promise<void> {
 
 async function fetchCsrfToken(): Promise<string | null> {
   try {
-    const res = await fetch(`${AUTH_BASE_URL}/auth/csrf`, {
+    const res = await fetch(buildUrl("/auth/csrf"), {
       method: "GET",
       credentials: "include",
       headers: { Accept: "application/json" },
@@ -264,10 +275,8 @@ export type Submission = {
   content: string;
   grade?: number | null;
   submitted_at: string;
-  file_url?: string | null; // <-- add this line
+  file_url?: string | null; // <-- kept this
 };
-
-
 
 export type InstructorRequest = {
   id: number;
@@ -326,7 +335,11 @@ export async function confirmPasswordReset(
 
 export async function verifyEmail(token: string): Promise<BasicOk> {
   const qs = new URLSearchParams({ token });
-  return request(`/auth/verify-email?${qs.toString()}`, { method: "POST" });
+  // Backend verify-email endpoint is GET
+  return request(`/auth/verify-email?${qs.toString()}`, {
+    method: "GET",
+    skipCsrf: true,
+  });
 }
 
 export async function getProfile(): Promise<UserProfile> {
@@ -336,12 +349,10 @@ export async function getProfile(): Promise<UserProfile> {
 // --- Classrooms ---
 
 export async function listClassrooms(): Promise<Classroom[]> {
-  // GET /api/classrooms
   return request("/classrooms", { method: "GET" });
 }
 
 export async function createClassroom(name: string): Promise<Classroom> {
-  // POST /api/classrooms
   return request("/classrooms", {
     method: "POST",
     json: { name },
@@ -349,7 +360,6 @@ export async function createClassroom(name: string): Promise<Classroom> {
 }
 
 export async function joinClassroom(code: string): Promise<BasicOk> {
-  // POST /api/classrooms/join
   return request("/classrooms/join", {
     method: "POST",
     json: { code },
@@ -380,7 +390,6 @@ export async function getAssignment(
 export async function createAssignment(
   payload: AssignmentCreatePayload,
 ): Promise<Assignment> {
-  // POST /api/assignments/
   return request("/assignments/", {
     method: "POST",
     json: payload,
@@ -409,7 +418,6 @@ export async function submitAssignment(
   assignmentId: number,
   content: string,
 ): Promise<Submission> {
-  // POST /api/submissions/
   return request("/submissions/", {
     method: "POST",
     json: { assignment_id: assignmentId, content },
@@ -458,7 +466,6 @@ export async function createMaterial(payload: {
   description?: string | null;
   file_url?: string | null;
 }): Promise<Material> {
-  // POST /api/materials/
   return request("/materials/", {
     method: "POST",
     json: payload,
@@ -579,5 +586,3 @@ export const api = {
   verifyTotpMfa,
   disableTotpMfa,
 };
-
-
