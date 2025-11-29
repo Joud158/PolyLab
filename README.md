@@ -16,13 +16,13 @@ studying cryptography.
 
 This project was developed by:
 
--   **Joud Senan**\
--   **Aya El Hajj**\
--   **Ghada Al Danab**\
+-   **Joud Senan**
+-   **Aya El Hajj**
+-   **Ghada Al Danab**
 -   **Roaa Hajj Chehade**
 
 As part of the course:\
-📘 **EECE 455 --- Cryptography and Network Security**
+📘 **EECE 455: Cryptography and Network Security**
 
 ------------------------------------------------------------------------
 
@@ -40,10 +40,10 @@ As part of the course:\
 
 ### 🧮 GF(2ᵐ) Polynomial Calculator
 
-Integrated cryptographic polynomial engine featuring: - Polynomial
-addition, subtraction, multiplication\
-- Modular reduction\
-- AES Rijndael GF(2⁸) operations\
+Integrated cryptographic polynomial engine featuring: 
+- Polynomial addition, subtraction, multiplication
+- Modular reduction
+- AES Rijndael GF(2⁸) operations
 - Step-by-step visual explanations for learning
 
 Perfect for cryptography students practicing finite field arithmetic.
@@ -52,20 +52,20 @@ Perfect for cryptography students practicing finite field arithmetic.
 
 ### 🏫 Classroom Management
 
--   Instructors can create/manage classrooms\
--   Invite students using a join code\
--   Upload learning materials\
--   Create assignments with deadlines\
+-   Instructors can create/manage classrooms
+-   Invite students using a join code
+-   Upload learning materials
+-   Create assignments with deadlines
 -   Use assignment templates for polynomial exercises
 
 ------------------------------------------------------------------------
 
 ### 📥 Assignment & Submission System
 
--   Students can write answers or upload files\
--   Instructors can preview submissions inline\
--   Full submission review pages for both instructor and student\
--   Timestamp conversion to **Lebanon (Asia/Beirut)** timezone\
+-   Students can write answers or upload files
+-   Instructors can preview submissions inline
+-   Full submission review pages for both instructor and student
+-   Timestamp conversion to **Lebanon (Asia/Beirut)** timezone
 -   Grade entry and per-assignment review
 
 ------------------------------------------------------------------------
@@ -89,7 +89,7 @@ Perfect for cryptography students practicing finite field arithmetic.
 ### 📦 Deployment
 
 -   Dockerized backend + frontend
--   Ready for deployment on Render, AWS, or Docker-based environments
+-   Deployed on Render 
 
 ------------------------------------------------------------------------
 
@@ -98,7 +98,7 @@ Perfect for cryptography students practicing finite field arithmetic.
 ### 1️⃣ Clone the repository
 
 ``` bash
-git clone https://github.com/your-username/PolyLab.git
+git clone https://github.com/Joud158/PolyLab.git
 cd PolyLab
 ```
 
@@ -138,8 +138,7 @@ npm run dev
 
 ## 📜 License
 
-This project is created for **academic and educational purposes** as
-part of the EECE 455 course.
+This project is created for **academic and educational purposes** as part of the EECE 455 course.
 
 ------------------------------------------------------------------------
 
