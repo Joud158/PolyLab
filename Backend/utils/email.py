@@ -1,37 +1,57 @@
-import smtplib
-from email.message import EmailMessage
-
 from sqlalchemy.orm import Session
+import requests
 
 from ..core.config import settings
 from ..models import User
 from .tokens import make_token
 
+MAILJET_URL = "https://api.mailjet.com/v3.1/send"
+
 
 def _send_mail(to: str, subject: str, body: str) -> None:
+    """
+    Send an email using Mailjet's HTTP API.
+    Falls back to printing in dev if mail settings are not configured.
+    """
     if not (
-        settings.SMTP_HOST
-        and settings.SMTP_USER
+        settings.SMTP_USER
         and settings.SMTP_PASSWORD
         and settings.MAIL_FROM
     ):
+        # Dev fallback: just print the email content
         print(f"[DEV] Would send email to {to}: {subject}\n{body}\n")
         return
 
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = str(settings.MAIL_FROM)
-    msg["To"] = to
-    msg.set_content(body)
+    payload = {
+        "Messages": [
+            {
+                "From": {
+                    "Email": str(settings.MAIL_FROM),
+                    "Name": "PolyLab",
+                },
+                "To": [{"Email": to}],
+                "Subject": subject,
+                "TextPart": body,
+            }
+        ]
+    }
 
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as smtp:
-            smtp.starttls()
-            smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            smtp.send_message(msg)
-        print(f"[MAIL] Sent email to {to}: {subject}")
-    except Exception as exc:  # pragma: no cover - best effort
-        print(f"[ERROR] SMTP send failed: {exc}")
+        resp = requests.post(
+            MAILJET_URL,
+            auth=(settings.SMTP_USER, settings.SMTP_PASSWORD),
+            json=payload,
+            timeout=10,
+        )
+        if resp.status_code >= 400:
+            print(
+                f"[ERROR] Mailjet API send failed: "
+                f"status={resp.status_code}, body={resp.text}"
+            )
+        else:
+            print(f"[MAIL] Sent email to {to}: {subject}")
+    except Exception as exc:  # best-effort, don't break signup/reset
+        print(f"[ERROR] Mailjet API send failed: {repr(exc)}")
 
 
 def send_verification_email(db: Session, user: User) -> str:
@@ -60,4 +80,3 @@ def send_reset_email(db: Session, user: User) -> str:
     _send_mail(user.email, "Reset your PolyLab password", body)
     print(f"[DEV] Reset link for {user.email}: {link}")
     return token
-
