@@ -23,16 +23,33 @@ def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 
 
+from fastapi import Response
+from .config import settings
+
 def set_session_cookie(response: Response, session_id: str) -> None:
-    response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=session_id,
-        httponly=True,
-        secure=not settings.DEBUG,
-        samesite="lax",
-        max_age=settings.SESSION_TTL_MINUTES * 60,
-        path="/",
-    )
+    """
+    Set the session cookie.
+
+    - In local dev (DEBUG=True): SameSite=Lax, Secure=False (works with http://localhost).
+    - In production (DEBUG=False): SameSite=None, Secure=True (required for cross-site frontend/backend).
+    """
+    cookie_kwargs = {
+        "key": settings.SESSION_COOKIE_NAME,
+        "value": session_id,
+        "httponly": True,
+        "max_age": settings.SESSION_TTL_MINUTES * 60,
+        "path": "/",
+    }
+
+    if settings.DEBUG:
+        cookie_kwargs["secure"] = False
+        cookie_kwargs["samesite"] = "lax"
+    else:
+        cookie_kwargs["secure"] = True
+        cookie_kwargs["samesite"] = "none"
+
+    response.set_cookie(**cookie_kwargs)
+
 
 
 def clear_session_cookie(response: Response) -> None:

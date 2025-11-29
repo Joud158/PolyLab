@@ -7,17 +7,30 @@ from .config import settings
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
+from fastapi import Response
+from .config import settings
+import secrets
+
 def issue_csrf(response: Response) -> str:
     token = secrets.token_urlsafe(32)
-    response.set_cookie(
-        key=settings.CSRF_COOKIE_NAME,
-        value=token,
-        httponly=False,
-        secure=not settings.DEBUG,
-        samesite="lax",
-        path="/",
-    )
+
+    cookie_kwargs = {
+        "key": settings.CSRF_COOKIE_NAME,
+        "value": token,
+        "httponly": False,  # JS must read it
+        "path": "/",
+    }
+
+    if settings.DEBUG:
+        cookie_kwargs["secure"] = False
+        cookie_kwargs["samesite"] = "lax"
+    else:
+        cookie_kwargs["secure"] = True
+        cookie_kwargs["samesite"] = "none"
+
+    response.set_cookie(**cookie_kwargs)
     return token
+
 
 
 def csrf_protect(request: Request) -> None:
