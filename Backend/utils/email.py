@@ -56,7 +56,8 @@ def _send_mail(to: str, subject: str, body: str) -> None:
 
 def send_verification_email(db: Session, user: User) -> str:
     token = make_token(db, user, "verify", minutes=60)
-    link = f"{settings.BACKEND_BASE_URL}/auth/verify-email?token={token}"
+    # NOTE: add /api here
+    link = f"{settings.BACKEND_BASE_URL}/api/auth/verify-email?token={token}"
     body = (
         "Hi,\n\n"
         "Please verify your PolyLab account by clicking this link:\n"
@@ -70,7 +71,8 @@ def send_verification_email(db: Session, user: User) -> str:
 
 def send_reset_email(db: Session, user: User) -> str:
     token = make_token(db, user, "reset", minutes=30)
-    link = f"{settings.BACKEND_BASE_URL}/auth/reset/confirm?token={token}"
+    # NOTE: add /api here too
+    link = f"{settings.BACKEND_BASE_URL}/api/auth/reset/confirm?token={token}"
     body = (
         "Hi,\n\n"
         "To reset your PolyLab password, click this link:\n"
@@ -80,3 +82,4 @@ def send_reset_email(db: Session, user: User) -> str:
     _send_mail(user.email, "Reset your PolyLab password", body)
     print(f"[DEV] Reset link for {user.email}: {link}")
     return token
+
