@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 # Ensure project root is importable when launched from within services/
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 

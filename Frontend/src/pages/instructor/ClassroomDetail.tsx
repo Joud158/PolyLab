@@ -25,9 +25,40 @@ import {
 } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, Inbox, Clock3, Download, ExternalLink } from "lucide-react";
-import bgCircuit from "@/assets/background.png"; // your background image
+import {
+  Upload,
+  FileText,
+  Inbox,
+  Clock3,
+  Download,
+  ExternalLink,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import bgCircuit from "@/assets/background.png";
 import { useAuth } from "@/contexts/AuthContext";
+
+/**
+ * Helper to parse datetimes coming from the backend.
+ * If the string has no timezone info, we treat it as UTC.
+ */
+function parseBackendTime(iso: string): Date {
+  // has explicit timezone like 2025-11-29T13:31:31+02:00 or Z
+  if (/[zZ]|[+-]\d\d:\d\d$/.test(iso)) {
+    return new Date(iso);
+  }
+  // assume backend gave UTC without tz; force UTC
+  return new Date(iso + "Z");
+}
+
+/**
+ * Format a backend datetime string in Lebanon time.
+ */
+function formatLebanonDateTime(iso: string): string {
+  return parseBackendTime(iso).toLocaleString("en-LB", {
+    timeZone: "Asia/Beirut",
+  });
+}
 
 export default function ClassroomDetail() {
   const { classId } = useParams();
@@ -41,11 +72,17 @@ export default function ClassroomDetail() {
   const [loadingMaterials, setLoadingMaterials] = useState(true);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [selectedAssignment, setSelectedAssignment] =
+    useState<Assignment | null>(null);
+
+  // Map assignment.id -> assignment number based on creation time
   const asgNumberMap = React.useMemo(() => {
     const sorted = [...assignments].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      (a, b) =>
+        parseBackendTime(a.created_at).getTime() -
+        parseBackendTime(b.created_at).getTime(),
     );
+
     const map: Record<number, number> = {};
     sorted.forEach((a, idx) => {
       map[a.id] = idx + 1;
@@ -59,7 +96,8 @@ export default function ClassroomDetail() {
       const data = await listClassrooms();
       setClasses(data);
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to load classrooms";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to load classrooms";
       setError(msg);
     } finally {
       setLoadingClasses(false);
@@ -75,7 +113,8 @@ export default function ClassroomDetail() {
       const subs = await listSubmissionsForClassroom(classId);
       setSubmissions(subs);
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to load assignments";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to load assignments";
       setError(msg);
     } finally {
       setLoadingAssignments(false);
@@ -89,7 +128,8 @@ export default function ClassroomDetail() {
       const data = await listMaterials(classId);
       setMaterials(data);
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to load materials";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to load materials";
       setError(msg);
     } finally {
       setLoadingMaterials(false);
@@ -119,12 +159,17 @@ export default function ClassroomDetail() {
   if (loadingClasses) {
     return (
       <div className="relative min-h-screen bg-slate-950 text-slate-100">
-        <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+          style={{ backgroundImage: `url(${bgCircuit})` }}
+        />
         <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
         <div className="relative z-10">
           <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
           <main className="mx-auto max-w-3xl px-4 py-10">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">Loading classroom...</div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
+              Loading classroom...
+            </div>
           </main>
         </div>
       </div>
@@ -134,12 +179,17 @@ export default function ClassroomDetail() {
   if (!classroom) {
     return (
       <div className="relative min-h-screen bg-slate-950 text-slate-100">
-        <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+          style={{ backgroundImage: `url(${bgCircuit})` }}
+        />
         <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
         <div className="relative z-10">
           <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
           <main className="mx-auto max-w-3xl px-4 py-10">
-            <div className="rounded-xl border border-rose-700/40 bg-rose-900/20 p-6">Classroom not found.</div>
+            <div className="rounded-xl border border-rose-700/40 bg-rose-900/20 p-6">
+              Classroom not found.
+            </div>
           </main>
         </div>
       </div>
@@ -148,7 +198,10 @@ export default function ClassroomDetail() {
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100">
-      <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+        style={{ backgroundImage: `url(${bgCircuit})` }}
+      />
       <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
       <div className="relative z-10">
         <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
@@ -197,7 +250,10 @@ export default function ClassroomDetail() {
             </TabsContent>
 
             <TabsContent value="submissions" className="mt-4">
-              <SubmissionsPanel submissions={submissions} assignments={assignments} />
+              <SubmissionsPanel
+                submissions={submissions}
+                assignments={assignments}
+              />
             </TabsContent>
           </Tabs>
 
@@ -206,7 +262,10 @@ export default function ClassroomDetail() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-lg font-semibold">
-                    Asg {asgNumberMap[selectedAssignment.id] ?? selectedAssignment.id}: {selectedAssignment.title}
+                    Asg{" "}
+                    {asgNumberMap[selectedAssignment.id] ??
+                      selectedAssignment.id}
+                    : {selectedAssignment.title}
                   </div>
                   {selectedAssignment.description && (
                     <div className="text-sm text-slate-300 whitespace-pre-line mt-1">
@@ -237,7 +296,11 @@ export default function ClassroomDetail() {
           )}
 
           <div className="mt-6">
-            <Button variant="outline" className="border-slate-700 text-slate-200" onClick={() => window.history.back()}>
+            <Button
+              variant="outline"
+              className="border-slate-700 text-slate-200"
+              onClick={() => window.history.back()}
+            >
               Back
             </Button>
           </div>
@@ -268,7 +331,9 @@ function AssignmentsPanel({
 }) {
   const asgNumberMap = React.useMemo(() => {
     const sorted = [...assignments].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      (a, b) =>
+        parseBackendTime(a.created_at).getTime() -
+        parseBackendTime(b.created_at).getTime(),
     );
     const map: Record<number, number> = {};
     sorted.forEach((a, idx) => {
@@ -276,6 +341,7 @@ function AssignmentsPanel({
     });
     return map;
   }, [assignments]);
+
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [due, setDue] = useState("");
@@ -320,7 +386,8 @@ function AssignmentsPanel({
       setFile(null);
       await onRefresh();
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to create assignment";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to create assignment";
       setLocalError(msg);
       onError(msg);
     } finally {
@@ -333,7 +400,11 @@ function AssignmentsPanel({
       <div className="grid gap-3 md:grid-cols-3">
         <div>
           <label className="text-sm text-slate-300">Title</label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-slate-900/60 border-slate-700" />
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="bg-slate-900/60 border-slate-700"
+          />
         </div>
         <div>
           <label className="text-sm text-slate-300">Due (optional)</label>
@@ -360,10 +431,10 @@ function AssignmentsPanel({
           </select>
         </div>
         <div className="md:col-span-3">
-          <label className="text-sm text-slate-300">Attach assignment PDF/document (optional)</label>
-          <div
-            className="mt-1 flex items-center gap-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-200"
-          >
+          <label className="text-sm text-slate-300">
+            Attach assignment PDF/document (optional)
+          </label>
+          <div className="mt-1 flex items-center gap-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-200">
             <input
               type="file"
               className="text-sm text-slate-200"
@@ -371,7 +442,9 @@ function AssignmentsPanel({
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
             {file ? (
-              <span className="text-xs text-slate-400 truncate">{file.name}</span>
+              <span className="text-xs text-slate-400 truncate">
+                {file.name}
+              </span>
             ) : (
               <span className="text-xs text-slate-500">No file chosen</span>
             )}
@@ -392,8 +465,13 @@ function AssignmentsPanel({
           {localError}
         </div>
       )}
-      <Button onClick={add} disabled={saving} className="h-11 bg-cyan-500 text-slate-900 hover:bg-cyan-400">
-        <Upload className="h-4 w-4 mr-1" /> {saving ? "Publishing..." : "Publish Assignment"}
+      <Button
+        onClick={add}
+        disabled={saving}
+        className="h-11 bg-cyan-500 text-slate-900 hover:bg-cyan-400"
+      >
+        <Upload className="h-4 w-4 mr-1" />{" "}
+        {saving ? "Publishing..." : "Publish Assignment"}
       </Button>
 
       <div className="space-y-3">
@@ -407,14 +485,26 @@ function AssignmentsPanel({
           </div>
         ) : (
           assignments.map((a, idx) => (
-            <div key={a.id} className="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
+            <div
+              key={a.id}
+              className="rounded-lg border border-slate-800 bg-slate-900/50 p-4"
+            >
               <div className="flex items-start gap-3">
                 <Inbox className="h-5 w-5 text-indigo-400 mt-0.5" />
                 <div>
-                  <div className="font-semibold">{`Asg ${asgNumberMap[a.id] ?? idx + 1}: ${a.title}`}</div>
-                  {a.description && <div className="text-sm text-slate-400 whitespace-pre-line">{a.description}</div>}
+                  <div className="font-semibold">
+                    {`Asg ${asgNumberMap[a.id] ?? idx + 1}: ${a.title}`}
+                  </div>
+                  {a.description && (
+                    <div className="text-sm text-slate-400 whitespace-pre-line">
+                      {a.description}
+                    </div>
+                  )}
                   <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                    <Clock3 className="h-3.5 w-3.5" /> {a.due_date ? `Due ${new Date(a.due_date).toLocaleString()}` : "No due date"}
+                    <Clock3 className="h-3.5 w-3.5" />{" "}
+                    {a.due_date
+                      ? `Due ${formatLebanonDateTime(a.due_date)}`
+                      : "No due date"}
                   </div>
                   {a.attachment_url && (
                     <div className="mt-2">
@@ -437,8 +527,16 @@ function AssignmentsPanel({
                     >
                       Open inline
                     </Button>
-                    <Link to={`/instructor/assignments/${a.id}`} target="_blank" rel="noreferrer">
-                      <Button size="sm" variant="ghost" className="text-cyan-300 hover:text-cyan-200">
+                    <Link
+                      to={`/instructor/assignments/${a.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-cyan-300 hover:text-cyan-200"
+                      >
                         Open in new tab
                       </Button>
                     </Link>
@@ -487,6 +585,7 @@ function MaterialsPanel({
         classroom_id: classroomId,
         title: title.trim(),
         description: desc.trim() || null,
+        file_url: null,
       });
       if (file) {
         await uploadMaterialFile(created.id, file);
@@ -497,7 +596,8 @@ function MaterialsPanel({
       setFile(null);
       await onRefresh();
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to upload material";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to upload material";
       setLocalError(msg);
       onError(msg);
     } finally {
@@ -510,11 +610,21 @@ function MaterialsPanel({
       <div className="grid gap-3 md:grid-cols-3">
         <div className="md:col-span-1">
           <label className="text-sm text-slate-300">Title</label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-slate-900/60 border-slate-700" />
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="bg-slate-900/60 border-slate-700"
+          />
         </div>
         <div className="md:col-span-2">
-          <label className="text-sm text-slate-300">Description (optional)</label>
-          <Input value={desc} onChange={(e) => setDesc(e.target.value)} className="bg-slate-900/60 border-slate-700" />
+          <label className="text-sm text-slate-300">
+            Description (optional)
+          </label>
+          <Input
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            className="bg-slate-900/60 border-slate-700"
+          />
         </div>
         <div className="md:col-span-3">
           <label className="text-sm text-slate-300">Attach file (optional)</label>
@@ -524,7 +634,13 @@ function MaterialsPanel({
               className="text-sm text-slate-200"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-            {file ? <span className="text-xs text-slate-400 truncate">{file.name}</span> : <span className="text-xs text-slate-500">No file chosen</span>}
+            {file ? (
+              <span className="text-xs text-slate-400 truncate">
+                {file.name}
+              </span>
+            ) : (
+              <span className="text-xs text-slate-500">No file chosen</span>
+            )}
           </div>
         </div>
       </div>
@@ -533,24 +649,38 @@ function MaterialsPanel({
           {localError}
         </div>
       )}
-      <Button onClick={add} disabled={saving} className="h-11 bg-cyan-500 text-slate-900 hover:bg-cyan-400">
-        <Upload className="h-4 w-4 mr-1" /> {saving ? "Uploading..." : "Upload Material"}
+      <Button
+        onClick={add}
+        disabled={saving}
+        className="h-11 bg-cyan-500 text-slate-900 hover:bg-cyan-400"
+      >
+        <Upload className="h-4 w-4 mr-1" />{" "}
+        {saving ? "Uploading..." : "Upload Material"}
       </Button>
 
       <div className="space-y-3">
         {loading ? (
-          <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-slate-300">Loading materials...</div>
+          <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-slate-300">
+            Loading materials...
+          </div>
         ) : materials.length === 0 ? (
           <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-slate-300">
             No materials yet. Upload slides, PDFs, or links.
           </div>
         ) : (
           materials.map((m) => (
-            <div key={m.id} className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 flex items-start gap-3">
+            <div
+              key={m.id}
+              className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 flex items-start gap-3"
+            >
               <FileText className="h-5 w-5 text-cyan-400 mt-0.5" />
               <div className="flex-1">
                 <div className="font-semibold">{m.title}</div>
-                {m.description && <div className="text-sm text-slate-400">{m.description}</div>}
+                {m.description && (
+                  <div className="text-sm text-slate-400">
+                    {m.description}
+                  </div>
+                )}
                 {m.file_url && (
                   <a
                     href={`${AUTH_BASE_URL}${m.file_url}`}
@@ -578,18 +708,21 @@ function SubmissionsPanel({
   assignments: Assignment[];
 }) {
   const relative = (iso: string) => {
+    const thenDate = parseBackendTime(iso);
     const now = Date.now();
-    const then = new Date(iso).getTime();
+    const then = thenDate.getTime();
     const diffMs = now - then;
+
     const diffSec = Math.round(diffMs / 1000);
     const diffMin = Math.round(diffSec / 60);
     const diffHr = Math.round(diffMin / 60);
     const diffDay = Math.round(diffHr / 24);
+
     if (diffSec < 45) return "just now";
     if (diffMin < 90) return `${diffMin}m ago`;
     if (diffHr < 36) return `${diffHr}h ago`;
     if (diffDay < 14) return `${diffDay}d ago`;
-    return new Date(iso).toLocaleString();
+    return thenDate.toLocaleString("en-LB", { timeZone: "Asia/Beirut" });
   };
 
   const grouped = assignments.map((a, idx) => ({
@@ -606,17 +739,30 @@ function SubmissionsPanel({
         </div>
       ) : (
         grouped.map(({ assignment, label, subs }) => (
-          <div key={assignment.id} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-2">
+          <div
+            key={assignment.id}
+            className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-2"
+          >
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-slate-100">
                 {label}: {assignment.title}
               </div>
-              <div className="text-xs text-slate-500">{subs.length} submission(s)</div>
+              <div className="text-xs text-slate-500">
+                {subs.length} submission(s)
+              </div>
             </div>
             {subs.length === 0 ? (
-              <div className="text-sm text-slate-400">No submissions for this assignment.</div>
+              <div className="text-sm text-slate-400">
+                No submissions for this assignment.
+              </div>
             ) : (
-              subs.map((s) => <SubmissionRow key={s.id} submission={s} relative={relative} />)
+              subs.map((s) => (
+                <SubmissionRow
+                  key={s.id}
+                  submission={s}
+                  relative={relative}
+                />
+              ))
             )}
           </div>
         ))
@@ -625,10 +771,19 @@ function SubmissionsPanel({
   );
 }
 
-function SubmissionRow({ submission, relative }: { submission: Submission; relative: (iso: string) => string }) {
-  const [gradeInput, setGradeInput] = React.useState<string | number>(submission.grade ?? "");
+function SubmissionRow({
+  submission,
+  relative,
+}: {
+  submission: Submission;
+  relative: (iso: string) => string;
+}) {
+  const [gradeInput, setGradeInput] = React.useState<string | number>(
+    submission.grade ?? "",
+  );
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
+  const [showDetails, setShowDetails] = React.useState(false);
 
   async function saveGrade() {
     const num = Number(gradeInput);
@@ -642,24 +797,42 @@ function SubmissionRow({ submission, relative }: { submission: Submission; relat
       await gradeSubmission(submission.id, num);
       submission.grade = num;
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to save grade";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to save grade";
       setErr(msg);
     } finally {
       setSaving(false);
     }
   }
 
+  const fileUrl = submission.file_url ?? null;
+  const submittedAtLocal = formatLebanonDateTime(submission.submitted_at);
+
+  // 🔗 paths for detailed views
+  const instructorSubmissionPath = `/instructor/submissions/${submission.id}`;
+  const studentSubmissionPath = `/student/submissions/${submission.id}`;
+
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
-      <div className="flex justify-between text-sm text-slate-200">
+    <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 space-y-3">
+      {/* Top row: student + time + grade + view buttons */}
+      <div className="flex flex-wrap justify-between gap-4 text-sm text-slate-200">
         <div>
-          <div className="font-semibold">{submission.user_email ?? `User #${submission.user_id}`}</div>
-          <div className="text-xs text-slate-400">
-            Submitted {relative(submission.submitted_at)}
+          <div className="font-semibold">
+            {submission.user_email ?? `User #${submission.user_id}`}
           </div>
-          <div className="text-xs text-slate-500">Submission ID: {submission.id}</div>
+          <button
+            type="button"
+            className="text-xs text-sky-300 hover:text-sky-200 underline"
+            onClick={() => setShowDetails((v) => !v)}
+          >
+            Submitted {relative(submission.submitted_at)} • {submittedAtLocal}
+          </button>
+          <div className="text-xs text-slate-500">
+            Submission ID: {submission.id}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="number"
             value={gradeInput}
@@ -667,15 +840,108 @@ function SubmissionRow({ submission, relative }: { submission: Submission; relat
             className="w-20 h-9 bg-slate-900/70 border-slate-700 text-sm"
             placeholder="Grade"
           />
-          <Button size="sm" variant="outline" className="border-slate-700 text-slate-200" disabled={saving} onClick={saveGrade}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-slate-700 text-slate-200"
+            disabled={saving}
+            onClick={saveGrade}
+          >
             {saving ? "Saving..." : "Save"}
           </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-sky-300 hover:text-sky-200"
+            onClick={() => setShowDetails((v) => !v)}
+          >
+            {showDetails ? (
+              <>
+                <EyeOff className="h-4 w-4 mr-1" /> Hide submission
+              </>
+            ) : (
+              <>
+                <Eye className="h-4 w-4 mr-1" /> View submission
+              </>
+            )}
+          </Button>
+
+          {/* 👇 NEW: pass submission via state to the detailed pages */}
+          <Link
+            to={instructorSubmissionPath}
+            target="_blank"
+            rel="noreferrer"
+            state={{ submission }}
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-slate-700 text-slate-200"
+            >
+              Instructor view
+            </Button>
+          </Link>
+
+          <Link
+            to={studentSubmissionPath}
+            target="_blank"
+            rel="noreferrer"
+            state={{ submission }}
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-cyan-300 hover:text-cyan-200"
+            >
+              Student view
+            </Button>
+          </Link>
         </div>
       </div>
-      {err && <div className="text-xs text-rose-300 mt-2">{err}</div>}
-      {submission.grade !== null && submission.grade !== undefined && !err && (
-        <div className="text-xs text-emerald-300 mt-1">Grade saved: {submission.grade}</div>
+
+      {/* Details: text answer + attached file (inline) */}
+      {showDetails && (
+        <div className="space-y-2">
+          {submission.content && (
+            <div>
+              <div className="text-xs font-semibold text-slate-400 mb-1">
+                Answer:
+              </div>
+              <pre className="whitespace-pre-wrap rounded-md bg-slate-950/60 border border-slate-800 px-3 py-2 text-xs text-slate-100">
+                {submission.content}
+              </pre>
+            </div>
+          )}
+
+          {fileUrl && (
+            <div>
+              <a
+                href={`${AUTH_BASE_URL}${fileUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-200"
+              >
+                <Download className="h-4 w-4" /> Download attached file
+              </a>
+            </div>
+          )}
+        </div>
       )}
+
+      {/* Status messages */}
+      {err && <div className="text-xs text-rose-300 mt-1">{err}</div>}
+      {submission.grade !== null &&
+        submission.grade !== undefined &&
+        !err && (
+          <div className="text-xs text-emerald-300 mt-1">
+            Grade saved: {submission.grade}
+          </div>
+        )}
     </div>
   );
 }
+

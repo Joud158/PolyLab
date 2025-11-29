@@ -1,6 +1,10 @@
 from pathlib import Path
 import sys
 
+# ---------------------------------------------------------------------------
+# Package / import setup (so `uvicorn app:app` and `uvicorn Backend.main:app`
+# both work correctly)
+# ---------------------------------------------------------------------------
 if __package__ is None or __package__ == "":
     # Allow running `uvicorn main:app` from inside Backend/
     sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -30,27 +34,42 @@ from .routers import (
 )
 from .models import User, UserRole
 
+
+# ---------------------------------------------------------------------------
+# Database schema + seed admin
+# ---------------------------------------------------------------------------
 Base.metadata.create_all(bind=engine)
 
 
 def ensure_seed_admin() -> None:
+    """Create / fix the seed admin user if ADMIN_EMAIL / ADMIN_PASSWORD are set."""
     email = settings.ADMIN_EMAIL
     password = settings.ADMIN_PASSWORD
+
     if not email or not password:
         return
+
     if not password_policy_ok(password):
         print("[WARN] Seed admin not created: ADMIN_PASSWORD fails password policy")
         return
+
     db = SessionLocal()
     try:
         existing = db.query(User).filter(User.email == email).first()
         if existing:
-            if existing.role != UserRole.admin or not existing.email_verified:
+            # Ensure the seed admin has correct role and is verified
+            changed = False
+            if existing.role != UserRole.admin:
                 existing.role = UserRole.admin
+                changed = True
+            if not existing.email_verified:
                 existing.email_verified = True
+                changed = True
+            if changed:
                 db.add(existing)
                 db.commit()
             return
+
         admin_user = User(
             email=email,
             password_hash=hash_password(password),
@@ -66,8 +85,19 @@ def ensure_seed_admin() -> None:
 
 ensure_seed_admin()
 
-app = FastAPI(title=settings.APP_NAME)
+# ---------------------------------------------------------------------------
+# FastAPI app (docs explicitly enabled)
+# ---------------------------------------------------------------------------
+app = FastAPI(
+    title=settings.APP_NAME,
+    docs_url="/docs",            # Swagger UI
+    redoc_url=None,              # disable ReDoc (optional)
+    openapi_url="/openapi.json", # JSON schema
+)
 
+# ---------------------------------------------------------------------------
+# Middleware: CORS + Security headers
+# ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -75,21 +105,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ⚠️ Security headers middleware (CSP etc.)
 app.add_middleware(SecurityHeadersMiddleware)
-# Serve uploaded files (assignments/submissions)
+
+# ---------------------------------------------------------------------------
+# Static files (uploads)
+# ---------------------------------------------------------------------------
+# Make sure upload dir exists (important in Docker)
 Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
+# ---------------------------------------------------------------------------
+# Rate limiting middleware
+# ---------------------------------------------------------------------------
 @app.middleware("http")
 async def _rate_limit(request, call_next):
     await rate_limit(request)
     return await call_next(request)
 
 
+# ---------------------------------------------------------------------------
+# CSRF middleware
+# ---------------------------------------------------------------------------
 @app.middleware("http")
 async def _csrf(request, call_next):
     path = request.url.path
+
+    # Safe methods or explicitly exempted routes
     if (
         request.method in ("GET", "HEAD", "OPTIONS")
         or path.endswith("/auth/csrf")
@@ -98,22 +142,28 @@ async def _csrf(request, call_next):
         or path.startswith("/auth/verify-email")
         or path.startswith("/auth/reset")
         or path.startswith("/auth/logout")
-        
-
     ):
         return await call_next(request)
+
     try:
         csrf_protect(request)
-    except Exception as exc:  # return a clean 403 instead of crashing the middleware stack
+    except Exception as exc:  # return a clean 403 instead of crashing the stack
         from fastapi.responses import JSONResponse
         from fastapi import HTTPException
 
         if isinstance(exc, HTTPException):
-            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail},
+            )
         return JSONResponse(status_code=403, content={"detail": "CSRF check failed"})
+
     return await call_next(request)
 
 
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
 app.include_router(auth.router)
 app.include_router(mfa.router)
 app.include_router(me.router)
@@ -126,9 +176,13 @@ app.include_router(submission.router)
 app.include_router(admin.router)
 
 
+# ---------------------------------------------------------------------------
+# Health / root
+# ---------------------------------------------------------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.get("/")
 def read_root():

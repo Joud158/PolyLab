@@ -41,7 +41,7 @@ export default function InstructorDashboard() {
     setError(null);
     try {
       const data = await listClassrooms();
-      setClasses(data);
+      setClasses(Array.isArray(data) ? data : []);
     } catch (e: any) {
       const msg = e instanceof ApiError ? e.message : "Failed to load classrooms";
       setError(msg);
@@ -76,7 +76,7 @@ export default function InstructorDashboard() {
     }
   }
 
-  const top = classes.slice(0, 3);
+  const top = Array.isArray(classes) ? classes.slice(0, 3) : [];
 
   async function startMfaEnroll() {
     setMfaError(null);

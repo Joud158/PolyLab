@@ -3,7 +3,13 @@
 // Handles base URL resolution, credentials, CSRF tokens, and typed helpers.
 
 export const AUTH_BASE_URL: string =
-  import.meta.env.VITE_API_BASE_URL_AUTH || "/api";
+  (import.meta.env?.VITE_API_BASE_URL_AUTH &&
+    import.meta.env.VITE_API_BASE_URL_AUTH.trim() !== "")
+    ? import.meta.env.VITE_API_BASE_URL_AUTH
+    : "/api";
+
+console.log("AUTH_BASE_URL =", AUTH_BASE_URL);
+
 const CSRF_COOKIE_NAME = "csrf_token";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -25,6 +31,7 @@ function formatErrorMessage(status: number, data: unknown): string {
   if (detail) return detail;
 
   if (typeof data === "string") return data;
+
   if (Array.isArray(data)) {
     const merged = data.map(extractDetail).filter(Boolean).join("; ");
     if (merged) return merged;
@@ -99,6 +106,7 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
     finalInit.body = init.body;
   }
 
+  // CSRF for unsafe methods
   if (!SAFE_METHODS.has(method) && !init.skipCsrf) {
     const token = await ensureCsrfToken();
     if (!token) {
@@ -128,10 +136,13 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
   return (data as T) ?? (undefined as T);
 }
 
+// ----- CSRF helpers -----
+
 const csrfCache: { value: string | null; fetchedAt: number | null } = {
   value: null,
   fetchedAt: null,
 };
+
 let inflightCsrf: Promise<string | null> | null = null;
 
 async function ensureCsrfToken(): Promise<string | null> {
@@ -253,7 +264,10 @@ export type Submission = {
   content: string;
   grade?: number | null;
   submitted_at: string;
+  file_url?: string | null; // <-- add this line
 };
+
+
 
 export type InstructorRequest = {
   id: number;
@@ -261,7 +275,6 @@ export type InstructorRequest = {
   status: "pending" | "approved" | "rejected";
   note: string | null;
   file_path: string;
-  // Admin-facing fields may be present on GET /admin/roles/requests and GET /admin/roles/requests/{id}
   created_at?: string;
   decision_by?: number | null;
   decided_at?: string | null;
@@ -274,13 +287,13 @@ export type MFAEnrollOut = {
   mfa_token: string;
 };
 
+// --- Auth ---
+
 export async function signup(body: SignupPayload): Promise<BasicOk> {
   return request("/auth/signup", {
     method: "POST",
     json: body,
-    // Signup is CSRF-exempt server-side; skipping avoids an extra round-trip
-    // that can fail when the API isn't reachable yet.
-    skipCsrf: true,
+    skipCsrf: true, // signup is CSRF-exempt
   });
 }
 
@@ -288,11 +301,9 @@ export async function login(body: LoginPayload): Promise<BasicOk> {
   const result = await request<BasicOk>("/auth/login", {
     method: "POST",
     json: body,
-    // Login is CSRF-exempt before a session exists, but ensureCsrfToken
-    // prefetch keeps signup/other flows working. Skip to avoid extra hit.
-    skipCsrf: true,
+    skipCsrf: true, // login is CSRF-exempt before session
   });
-  await ensureCsrfToken(); // refresh after session cookie is set
+  await ensureCsrfToken(); // get CSRF after session cookie is set
   return result;
 }
 
@@ -325,10 +336,12 @@ export async function getProfile(): Promise<UserProfile> {
 // --- Classrooms ---
 
 export async function listClassrooms(): Promise<Classroom[]> {
+  // GET /api/classrooms
   return request("/classrooms", { method: "GET" });
 }
 
 export async function createClassroom(name: string): Promise<Classroom> {
+  // POST /api/classrooms
   return request("/classrooms", {
     method: "POST",
     json: { name },
@@ -336,6 +349,7 @@ export async function createClassroom(name: string): Promise<Classroom> {
 }
 
 export async function joinClassroom(code: string): Promise<BasicOk> {
+  // POST /api/classrooms/join
   return request("/classrooms/join", {
     method: "POST",
     json: { code },
@@ -351,16 +365,23 @@ type AssignmentCreatePayload = {
   due_date?: string | null;
 };
 
-export async function listAssignments(classroomId: number | string): Promise<Assignment[]> {
+export async function listAssignments(
+  classroomId: number | string,
+): Promise<Assignment[]> {
   return request(`/assignments/classroom/${classroomId}`, { method: "GET" });
 }
 
-export async function getAssignment(assignmentId: number | string): Promise<Assignment> {
+export async function getAssignment(
+  assignmentId: number | string,
+): Promise<Assignment> {
   return request(`/assignments/${assignmentId}`, { method: "GET" });
 }
 
-export async function createAssignment(payload: AssignmentCreatePayload): Promise<Assignment> {
-  return request("/assignments", {
+export async function createAssignment(
+  payload: AssignmentCreatePayload,
+): Promise<Assignment> {
+  // POST /api/assignments/
+  return request("/assignments/", {
     method: "POST",
     json: payload,
   });
@@ -382,11 +403,14 @@ export async function uploadAssignmentAttachment(
   });
 }
 
+// --- Submissions ---
+
 export async function submitAssignment(
   assignmentId: number,
   content: string,
 ): Promise<Submission> {
-  return request("/submissions", {
+  // POST /api/submissions/
+  return request("/submissions/", {
     method: "POST",
     json: { assignment_id: assignmentId, content },
   });
@@ -416,7 +440,11 @@ export async function listSubmissionsForClassroom(
   return request(`/submissions/classroom/${classroomId}`, { method: "GET" });
 }
 
-export async function listMaterials(classroomId: number | string): Promise<Material[]> {
+// --- Materials ---
+
+export async function listMaterials(
+  classroomId: number | string,
+): Promise<Material[]> {
   return request(`/materials/classroom/${classroomId}`, { method: "GET" });
 }
 
@@ -426,13 +454,17 @@ export async function createMaterial(payload: {
   description?: string | null;
   file_url?: string | null;
 }): Promise<Material> {
-  return request("/materials", {
+  // POST /api/materials/
+  return request("/materials/", {
     method: "POST",
     json: payload,
   });
 }
 
-export async function uploadMaterialFile(materialId: number, file: File): Promise<Material> {
+export async function uploadMaterialFile(
+  materialId: number,
+  file: File,
+): Promise<Material> {
   const form = new FormData();
   form.append("file", file);
   return request(`/materials/${materialId}/upload`, {
@@ -441,9 +473,16 @@ export async function uploadMaterialFile(materialId: number, file: File): Promis
   });
 }
 
-export async function gradeSubmission(submissionId: number, grade: number): Promise<BasicOk> {
+// --- Grading ---
+
+export async function gradeSubmission(
+  submissionId: number,
+  grade: number,
+): Promise<BasicOk> {
   const qs = new URLSearchParams({ grade: String(grade) });
-  return request(`/submissions/${submissionId}/grade?${qs.toString()}`, { method: "POST" });
+  return request(`/submissions/${submissionId}/grade?${qs.toString()}`, {
+    method: "POST",
+  });
 }
 
 // --- Instructor requests ---
@@ -468,11 +507,16 @@ export async function listInstructorRequests(
   return request(`/admin/roles/requests${qs}`, { method: "GET" });
 }
 
-export async function decideInstructorRequest(id: number, action: "approve" | "reject"): Promise<BasicOk> {
+export async function decideInstructorRequest(
+  id: number,
+  action: "approve" | "reject",
+): Promise<BasicOk> {
   return request(`/admin/roles/requests/${id}/${action}`, { method: "POST" });
 }
 
-export async function getInstructorRequest(id: number): Promise<InstructorRequest> {
+export async function getInstructorRequest(
+  id: number,
+): Promise<InstructorRequest> {
   return request(`/admin/roles/requests/${id}`, { method: "GET" });
 }
 
@@ -482,7 +526,10 @@ export async function enrollTotpMfa(): Promise<MFAEnrollOut> {
   return request("/auth/mfa/totp/enroll", { method: "POST" });
 }
 
-export async function verifyTotpMfa(code: string, mfaToken: string): Promise<BasicOk> {
+export async function verifyTotpMfa(
+  code: string,
+  mfaToken: string,
+): Promise<BasicOk> {
   return request("/auth/mfa/totp/verify", {
     method: "POST",
     json: { code, mfa_token: mfaToken },
@@ -520,11 +567,13 @@ export const api = {
   createMaterial,
   uploadMaterialFile,
   gradeSubmission,
-  decideInstructorRequest,
-  getInstructorRequest,
   submitInstructorRequest,
   listInstructorRequests,
+  decideInstructorRequest,
+  getInstructorRequest,
   enrollTotpMfa,
   verifyTotpMfa,
   disableTotpMfa,
 };
+
+

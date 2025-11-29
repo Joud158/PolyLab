@@ -7,6 +7,7 @@ from .. import models, schemas
 from ..database import get_db
 from ..deps import get_current_user, require_instructor
 
+# NOTE: prefix="/classrooms" and *no* trailing slash in route paths ("")
 router = APIRouter(prefix="/classrooms", tags=["Classrooms"])
 
 
@@ -19,12 +20,16 @@ def _generate_code(db: Session) -> str:
     raise RuntimeError("Unable to generate unique classroom code")
 
 
-@router.post("/", response_model=schemas.ClassroomOut)
+@router.post("", response_model=schemas.ClassroomOut)
 def create_classroom(
     payload: schemas.ClassroomCreate,
     db: Session = Depends(get_db),
     instructor=Depends(require_instructor),
 ):
+    """
+    POST /classrooms
+    Create a new classroom owned by the instructor, with a random join code.
+    """
     code = _generate_code(db)
     classroom = models.Classroom(
         name=payload.name,
@@ -34,9 +39,11 @@ def create_classroom(
     db.add(classroom)
     db.commit()
     db.refresh(classroom)
-    # Instructor automatically joins their classroom
+
+    # Instructor automatically joins their own classroom
     db.add(models.ClassroomMember(classroom_id=classroom.id, user_id=instructor.id))
     db.commit()
+
     return classroom
 
 
@@ -46,9 +53,14 @@ def join_classroom(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
+    """
+    POST /classrooms/join
+    Join a classroom by code. Idempotent for existing members.
+    """
     classroom = db.query(models.Classroom).filter_by(code=payload.code).first()
     if not classroom:
         raise HTTPException(status_code=404, detail="Invalid classroom code")
+
     membership = (
         db.query(models.ClassroomMember)
         .filter_by(classroom_id=classroom.id, user_id=user.id)
@@ -56,15 +68,21 @@ def join_classroom(
     )
     if membership:
         return {"ok": True}
+
     db.add(models.ClassroomMember(classroom_id=classroom.id, user_id=user.id))
     db.commit()
     return {"ok": True}
 
 
-@router.get("/", response_model=list[schemas.ClassroomOut])
+@router.get("", response_model=list[schemas.ClassroomOut])
 def list_classrooms(
-    db: Session = Depends(get_db), user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
 ):
+    """
+    GET /classrooms
+    Return classrooms the user owns (instructor) or is a member of (student).
+    """
     owned = db.query(models.Classroom).filter_by(instructor_id=user.id).all()
     member = (
         db.query(models.Classroom)

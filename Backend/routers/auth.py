@@ -53,10 +53,28 @@ def _verify_email_token(token: str, db: Session) -> None:
     db.commit()
 
 
-@router.post("/verify-email", response_model=BasicOK)
-def verify_email(token: str, db: Session = Depends(get_db)):
+@router.get("/verify-email", response_class=HTMLResponse)
+def verify_email_page(token: str, db: Session = Depends(get_db)):
+    """
+    Link clicked from the email: GET /auth/verify-email?token=...
+    Verifies the email and then redirects to the frontend /verify page.
+    """
     _verify_email_token(token, db)
-    return {"ok": True}
+
+    if settings.FRONTEND_ORIGIN:
+        target = f"{settings.FRONTEND_ORIGIN.rstrip('/')}/verify?token={token}&status=verified"
+        return RedirectResponse(target, status_code=307)
+
+    # Fallback if no FRONTEND_ORIGIN configured
+    return """
+    <html>
+      <head><title>Email verified</title></head>
+      <body style="font-family: system-ui; text-align:center; margin-top:4rem;">
+        <h1>Email verified 🎉</h1>
+        <p>Your email has been verified. You can now return to the PolyLab app and log in.</p>
+      </body>
+    </html>
+    """
 
 
 @router.get("/verify-email", response_class=HTMLResponse)

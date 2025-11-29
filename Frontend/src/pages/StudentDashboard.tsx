@@ -4,18 +4,27 @@ import NavbarStudent from "@/components/ui/StudentNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, ChevronRight } from "lucide-react";
-import bgCircuit from "@/assets/background.png"; // your background image
+import bgCircuit from "@/assets/background.png";
 import { useAuth } from "@/contexts/AuthContext";
-import { joinClassroom, listClassrooms, Classroom, ApiError, enrollTotpMfa, verifyTotpMfa, disableTotpMfa } from "@/lib/api";
+import {
+  joinClassroom,
+  listClassrooms,
+  Classroom,
+  ApiError,
+  enrollTotpMfa,
+  verifyTotpMfa,
+  disableTotpMfa,
+} from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const nav = useNavigate();
   const email = user?.email ?? "guest@polylab.dev";
-  const [mfaState, setMfaState] = useState<"idle" | "enrolling" | "verifying" | "enabled">(
-    user?.totp_enabled ? "enabled" : "idle",
-  );
+
+  const [mfaState, setMfaState] = useState<
+    "idle" | "enrolling" | "verifying" | "enabled"
+  >(user?.totp_enabled ? "enabled" : "idle");
   const [mfaSecret, setMfaSecret] = useState<string | null>(null);
   const [mfaOtpAuth, setMfaOtpAuth] = useState<string | null>(null);
   const [mfaToken, setMfaToken] = useState<string | null>(null);
@@ -35,9 +44,22 @@ export default function StudentDashboard() {
     setJoinError(null);
     try {
       const data = await listClassrooms();
-      setClasses(data);
+      console.log("DEBUG listClassrooms result:", data);
+
+      // Normalize whatever comes back into an array of classrooms
+      const raw: any = data as any;
+      const normalized: Classroom[] = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw.items)
+        ? raw.items
+        : Array.isArray(raw.classrooms)
+        ? raw.classrooms
+        : [];
+
+      setClasses(normalized);
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to load classrooms";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to load classrooms";
       setJoinError(msg);
     } finally {
       setClassesLoading(false);
@@ -62,7 +84,8 @@ export default function StudentDashboard() {
       setMfaToken(res.mfa_token);
       setMfaState("verifying");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Failed to start MFA setup.";
+      const msg =
+        err instanceof ApiError ? err.message : "Failed to start MFA setup.";
       setMfaError(msg);
       setMfaState("idle");
     }
@@ -75,7 +98,9 @@ export default function StudentDashboard() {
     try {
       await verifyTotpMfa(mfaCode.trim(), mfaToken);
       setMfaState("enabled");
-      setMfaSuccess("MFA enabled. Use your authenticator app for future logins.");
+      setMfaSuccess(
+        "MFA enabled. Use your authenticator app for future logins.",
+      );
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Invalid code.";
       setMfaError(msg);
@@ -97,7 +122,8 @@ export default function StudentDashboard() {
       setMfaToken(null);
       setMfaSuccess("MFA disabled.");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Unable to disable MFA.";
+      const msg =
+        err instanceof ApiError ? err.message : "Unable to disable MFA.";
       setMfaError(msg);
     }
   }
@@ -115,7 +141,10 @@ export default function StudentDashboard() {
       await loadClasses();
       setJoinCode("");
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Unable to join. Check the code or try again.";
+      const msg =
+        e instanceof ApiError
+          ? e.message
+          : "Unable to join. Check the code or try again.";
       setJoinError(msg);
     } finally {
       setJoining(false);
@@ -137,7 +166,9 @@ export default function StudentDashboard() {
 
         <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Student Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Student Dashboard
+            </h1>
             <p className="mt-1 text-sm text-slate-400">Signed in as {email}</p>
             <div className="mt-2 inline-flex items-center rounded-full bg-slate-800/70 px-2.5 py-1 text-xs">
               Student
@@ -145,7 +176,6 @@ export default function StudentDashboard() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-
             {/* RIGHT: My Classrooms */}
             <section className="rounded-2xl border border-slate-800 bg-slate-900/70 backdrop-blur p-6">
               <h2 className="text-xl font-semibold">My Classrooms</h2>
@@ -153,7 +183,9 @@ export default function StudentDashboard() {
               <div className="mt-4 flex items-center gap-2">
                 <input
                   value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 10))}
+                  onChange={(e) =>
+                    setJoinCode(e.target.value.toUpperCase().slice(0, 10))
+                  }
                   placeholder="Join a Classroom"
                   className="h-10 w-full rounded-lg bg-slate-900/70 border border-slate-700/70 px-3 text-slate-100 placeholder:text-slate-400"
                 />
@@ -166,8 +198,12 @@ export default function StudentDashboard() {
                 </button>
               </div>
 
-              <p className="mt-2 text-xs text-slate-500">Enter the code your instructor shared with you.</p>
-              {joinError && <p className="mt-2 text-sm text-rose-300">{joinError}</p>}
+              <p className="mt-2 text-xs text-slate-500">
+                Enter the code your instructor shared with you.
+              </p>
+              {joinError && (
+                <p className="mt-2 text-sm text-rose-300">{joinError}</p>
+              )}
 
               <div className="mt-5 space-y-3">
                 {classesLoading ? (
@@ -176,7 +212,8 @@ export default function StudentDashboard() {
                   </div>
                 ) : classes.length === 0 ? (
                   <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-slate-300">
-                    You are not enrolled in any classrooms yet. Enter a join code above to get started.
+                    You are not enrolled in any classrooms yet. Enter a join
+                    code above to get started.
                   </div>
                 ) : (
                   classes.map((c) => (
@@ -188,12 +225,15 @@ export default function StudentDashboard() {
                         <div>
                           <div className="font-semibold">{c.name}</div>
                           <div className="text-xs text-slate-500">
-                            Created {new Date(c.created_at).toLocaleDateString()}
+                            Created{" "}
+                            {new Date(c.created_at).toLocaleDateString()}
                           </div>
                         </div>
                         <button
                           className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800/60"
-                          onClick={() => nav(`/student/classrooms/${c.id}`)}
+                          onClick={() =>
+                            nav(`/student/classrooms/${c.id}`)
+                          }
                         >
                           Open Class <ChevronRight className="h-4 w-4" />
                         </button>
@@ -214,15 +254,27 @@ export default function StudentDashboard() {
           <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70 backdrop-blur p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold">Multi-Factor Authentication (TOTP)</h2>
-                <p className="text-slate-400 text-sm">Add an authenticator app code to your login.</p>
+                <h2 className="text-xl font-semibold">
+                  Multi-Factor Authentication (TOTP)
+                </h2>
+                <p className="text-slate-400 text-sm">
+                  Add an authenticator app code to your login.
+                </p>
               </div>
               <Button
                 onClick={startMfaEnroll}
-                disabled={mfaState === "enrolling" || mfaState === "verifying" || mfaState === "enabled"}
+                disabled={
+                  mfaState === "enrolling" ||
+                  mfaState === "verifying" ||
+                  mfaState === "enabled"
+                }
                 className="bg-cyan-500 text-slate-900 hover:bg-cyan-400 disabled:opacity-60"
               >
-                {mfaState === "enabled" ? "MFA Enabled" : mfaState === "verifying" || mfaState === "enrolling" ? "Continue setup" : "Enable MFA"}
+                {mfaState === "enabled"
+                  ? "MFA Enabled"
+                  : mfaState === "verifying" || mfaState === "enrolling"
+                  ? "Continue setup"
+                  : "Enable MFA"}
               </Button>
             </div>
 
@@ -242,13 +294,16 @@ export default function StudentDashboard() {
                 {mfaSecret && (
                   <div className="text-sm text-slate-300 flex items-center gap-2 flex-wrap">
                     <span>Secret:</span>
-                    <span className="font-mono bg-slate-800/70 px-2 py-1 rounded">{mfaSecret}</span>
+                    <span className="font-mono bg-slate-800/70 px-2 py-1 rounded">
+                      {mfaSecret}
+                    </span>
                   </div>
                 )}
                 {mfaOtpAuth && (
                   <div className="text-sm text-slate-300 space-y-2">
                     <div className="break-all">
-                      OTPAuth URL: <span className="font-mono">{mfaOtpAuth}</span>
+                      OTPAuth URL:{" "}
+                      <span className="font-mono">{mfaOtpAuth}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -256,12 +311,16 @@ export default function StudentDashboard() {
                         size="sm"
                         variant="outline"
                         className="border-slate-700 text-slate-200"
-                        onClick={() => navigator.clipboard.writeText(mfaOtpAuth)}
+                        onClick={() =>
+                          navigator.clipboard.writeText(mfaOtpAuth)
+                        }
                       >
                         Copy URL
                       </Button>
                       <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(mfaOtpAuth)}`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                          mfaOtpAuth,
+                        )}`}
                         alt="Scan to add to authenticator"
                         className="h-32 w-32 rounded-lg border border-slate-800 bg-slate-900/60 p-1"
                       />
@@ -269,10 +328,14 @@ export default function StudentDashboard() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Enter 6-digit code</label>
+                  <label className="block text-sm text-slate-300 mb-1">
+                    Enter 6-digit code
+                  </label>
                   <Input
                     value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    onChange={(e) =>
+                      setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
                     className="h-11 bg-slate-900/70 border-slate-700/70 max-w-xs"
                     placeholder="123456"
                   />
@@ -280,12 +343,18 @@ export default function StudentDashboard() {
                 <div className="flex gap-2">
                   <Button
                     onClick={verifyMfa}
-                    disabled={!mfaToken || mfaCode.length < 6 || mfaState === "enabled"}
+                    disabled={
+                      !mfaToken || mfaCode.length < 6 || mfaState === "enabled"
+                    }
                     className="bg-cyan-500 text-slate-900 hover:bg-cyan-400"
                   >
                     Verify code
                   </Button>
-                  <Button variant="outline" onClick={disableMfa} className="border-slate-700 text-slate-200">
+                  <Button
+                    variant="outline"
+                    onClick={disableMfa}
+                    className="border-slate-700 text-slate-200"
+                  >
                     Disable MFA
                   </Button>
                 </div>
@@ -297,4 +366,3 @@ export default function StudentDashboard() {
     </div>
   );
 }
-
