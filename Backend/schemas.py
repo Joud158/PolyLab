@@ -113,6 +113,7 @@ class SubmissionOut(SubmissionCreate, OrmBase):
     id: int
     user_id: int
     grade: Optional[float]
+    file_url: Optional[str] = None
     submitted_at: datetime
 
 

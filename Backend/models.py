@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -148,8 +148,9 @@ class Submission(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     assignment_id = Column(Integer, ForeignKey("assignments.id"), nullable=False)
     content = Column(Text, nullable=False)
+    file_url = Column(String, nullable=True)
     grade = Column(Float, nullable=True)
-    submitted_at = Column(DateTime, default=datetime.utcnow)
+    submitted_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     assignment = relationship("Assignment", back_populates="submissions")
     user = relationship("User", back_populates="submissions")

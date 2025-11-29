@@ -19,8 +19,13 @@ import {
   listMaterials,
   Material,
 } from "@/lib/api";
-import { Clock3, Send } from "lucide-react";
+import { Clock3, Eye, EyeOff, Send } from "lucide-react";
 import bgCircuit from "@/assets/background.png";
+
+function parseBackendTime(iso: string): Date {
+  if (/[zZ]|[+-]\d\d:\d\d$/.test(iso)) return new Date(iso);
+  return new Date(iso + "Z");
+}
 
 type DraftState = Record<
   number,
@@ -37,6 +42,7 @@ export default function StudentClassroom() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openSubs, setOpenSubs] = useState<Record<number, boolean>>({});
 
   const loadData = useCallback(async () => {
     if (!classId) return;
@@ -99,16 +105,16 @@ export default function StudentClassroom() {
       }));
       return;
     }
+    const trimmedContent = state.content.trim();
     setDrafts((prev) => ({
       ...prev,
       [assignmentId]: { ...state, submitting: true, error: undefined, success: undefined },
     }));
     try {
       if (state.file) {
-        await uploadAssignmentFile(assignmentId, state.file);
-      }
-      if (state.content.trim()) {
-        await submitAssignment(assignmentId, state.content.trim());
+        await uploadAssignmentFile(assignmentId, state.file, trimmedContent || null);
+      } else {
+        await submitAssignment(assignmentId, trimmedContent);
       }
       const subs = await listSubmissionsForAssignment(assignmentId);
       setMySubs((prev) => ({ ...prev, [assignmentId]: subs }));
@@ -225,9 +231,49 @@ export default function StudentClassroom() {
                             </div>
                           )}
                           {submitted && (
-                            <div className="mt-2 text-xs text-emerald-300">
-                              Submitted at {new Date(submitted.submitted_at).toLocaleString()}
-                              {submitted.grade !== null && submitted.grade !== undefined ? ` • Grade: ${submitted.grade}` : ""}
+                            <div className="mt-3 space-y-2">
+                              <div className="text-xs text-emerald-300">
+                                Submitted at {parseBackendTime(submitted.submitted_at).toLocaleString()}
+                                {submitted.grade !== null && submitted.grade !== undefined ? ` • Grade: ${submitted.grade}` : ""}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-cyan-300 hover:text-cyan-200 px-2"
+                                onClick={() =>
+                                  setOpenSubs((prev) => ({ ...prev, [submitted.id]: !prev[submitted.id] }))
+                                }
+                              >
+                                {openSubs[submitted.id] ? (
+                                  <>
+                                    <EyeOff className="h-4 w-4 mr-1" /> Hide submission
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="h-4 w-4 mr-1" /> View what you submitted
+                                  </>
+                                )}
+                              </Button>
+                              {openSubs[submitted.id] && (
+                                <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-100">
+                                  {submitted.content && (
+                                    <div>
+                                      <div className="font-semibold text-slate-300 mb-1">Answer</div>
+                                      <pre className="whitespace-pre-wrap text-slate-100">{submitted.content}</pre>
+                                    </div>
+                                  )}
+                                  {submitted.file_url && (
+                                    <a
+                                      href={`${AUTH_BASE_URL}${submitted.file_url}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+                                    >
+                                      Download your file
+                                    </a>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -318,10 +364,48 @@ export default function StudentClassroom() {
                       return (
                         <div key={s.id} className="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
                           <div className="font-semibold">{assignment?.title ?? `Assignment ${aid}`}</div>
-                          <div className="text-sm text-slate-400">
-                            Submitted {new Date(s.submitted_at).toLocaleString()}
-                            {s.grade !== null && s.grade !== undefined ? ` • Grade: ${s.grade}` : ""}
+                          <div className="text-sm text-slate-400 flex flex-wrap items-center gap-2">
+                            <span>
+                              Submitted {parseBackendTime(s.submitted_at).toLocaleString()}
+                              {s.grade !== null && s.grade !== undefined ? ` • Grade: ${s.grade}` : ""}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-cyan-300 hover:text-cyan-200 px-2"
+                              onClick={() => setOpenSubs((prev) => ({ ...prev, [s.id]: !prev[s.id] }))}
+                            >
+                              {openSubs[s.id] ? (
+                                <>
+                                  <EyeOff className="h-4 w-4 mr-1" /> Hide
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="h-4 w-4 mr-1" /> View details
+                                </>
+                              )}
+                            </Button>
                           </div>
+                          {openSubs[s.id] && (
+                            <div className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-200">
+                              {s.content && (
+                                <div>
+                                  <div className="text-xs font-semibold text-slate-400 mb-1">What you wrote</div>
+                                  <pre className="whitespace-pre-wrap text-slate-100">{s.content}</pre>
+                                </div>
+                              )}
+                              {s.file_url && (
+                                <a
+                                  href={`${AUTH_BASE_URL}${s.file_url}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 text-xs"
+                                >
+                                  Download your file
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     }),

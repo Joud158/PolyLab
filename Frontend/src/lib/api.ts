@@ -419,9 +419,13 @@ export async function submitAssignment(
 export async function uploadAssignmentFile(
   assignmentId: number,
   file: File,
+  content?: string | null,
 ): Promise<Submission> {
   const form = new FormData();
   form.append("file", file);
+  if (content && content.trim()) {
+    form.append("content", content.trim());
+  }
   return request(`/submissions/${assignmentId}/upload`, {
     method: "POST",
     body: form,

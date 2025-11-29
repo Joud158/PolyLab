@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from .. import models, schemas
 from ..database import get_db
@@ -39,6 +40,46 @@ def _ensure_membership(
         raise HTTPException(status_code=403, detail="You are not enrolled in this class")
 
 
+def _ensure_submission_file_column(db: Session) -> None:
+    """Add file_url column for submissions if DB was created before the field existed."""
+    result = db.execute(text("PRAGMA table_info(submissions)")).fetchall()
+    has_col = any(row[1] == "file_url" for row in result)
+    if not has_col:
+        db.execute(text("ALTER TABLE submissions ADD COLUMN file_url TEXT"))
+        db.commit()
+
+
+def _as_utc(dt: datetime) -> datetime:
+    """Normalize naive datetimes to UTC to avoid tz-offset mistakes."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _resolve_file_url(submission: models.Submission) -> str | None:
+    """Derive a downloadable URL for legacy rows where the file path was stored in content."""
+    if submission.file_url:
+        return submission.file_url
+    content = (submission.content or "").strip()
+    if not content:
+        return None
+    if "submissions" not in content:
+        return None
+    try:
+        path = Path(content)
+    except Exception:
+        return None
+    # If the stored content was a filesystem path, convert it to the mounted /uploads path.
+    parts = [p for p in path.parts if p]
+    if "uploads" in parts:
+        rel_parts = parts[parts.index("uploads") :]
+        return "/" + "/".join(rel_parts)
+    if parts and parts[0] != "uploads":
+        # handle relative paths like "submissions/assignment_1/file.ext"
+        return "/".join(("/uploads", *parts))
+    return None
+
+
 @router.post("/", response_model=schemas.SubmissionOut)
 def create_submission(
     payload: schemas.SubmissionCreate,
@@ -46,11 +87,17 @@ def create_submission(
     user=Depends(get_current_user),
 ):
     assignment = _get_assignment(db, payload.assignment_id)
-    if assignment.due_date and datetime.utcnow() > assignment.due_date:
+    _ensure_submission_file_column(db)
+    now = datetime.now(timezone.utc)
+    if assignment.due_date and now > _as_utc(assignment.due_date):
         raise HTTPException(status_code=400, detail="Past due date")
     _ensure_membership(db, assignment.classroom_id, user)
     submission = models.Submission(
-        user_id=user.id, assignment_id=assignment.id, content=payload.content
+        user_id=user.id,
+        assignment_id=assignment.id,
+        content=payload.content,
+        submitted_at=now,
+        file_url=None,
     )
     db.add(submission)
     db.commit()
@@ -64,6 +111,7 @@ def list_submissions_for_assignment(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
+    _ensure_submission_file_column(db)
     assignment = _get_assignment(db, assignment_id)
     classroom = assignment.classroom
     if user.role == models.UserRole.admin or classroom.instructor_id == user.id:
@@ -74,9 +122,16 @@ def list_submissions_for_assignment(
             .all()
         )
         latest: dict[int, models.Submission] = {}
+        file_fallback: dict[int, str] = {}
         for sub in submissions:
+            inferred_file = _resolve_file_url(sub)
+            if inferred_file and sub.user_id not in file_fallback:
+                file_fallback[sub.user_id] = inferred_file
             if sub.user_id not in latest:
                 latest[sub.user_id] = sub
+        for uid, sub in latest.items():
+            if not getattr(sub, "file_url", None):
+                sub.file_url = file_fallback.get(uid)
         return [
             schemas.SubmissionWithUser(
                 **schemas.SubmissionOut.model_validate(sub, from_attributes=True).model_dump(),
@@ -91,6 +146,9 @@ def list_submissions_for_assignment(
         .order_by(models.Submission.submitted_at.desc())
         .all()
     )
+    for sub in submissions:
+        if not getattr(sub, "file_url", None):
+            sub.file_url = _resolve_file_url(sub)
     return [
         schemas.SubmissionWithUser(
             **schemas.SubmissionOut.model_validate(sub, from_attributes=True).model_dump(),
@@ -106,6 +164,7 @@ def list_submissions_for_classroom(
     db: Session = Depends(get_db),
     user=Depends(require_instructor),
 ):
+    _ensure_submission_file_column(db)
     _ensure_membership(db, classroom_id, user)
     submissions = (
         db.query(models.Submission)
@@ -120,10 +179,17 @@ def list_submissions_for_classroom(
         .all()
     )
     latest: dict[tuple[int, int], models.Submission] = {}
+    file_fallback: dict[tuple[int, int], str] = {}
     for sub in submissions:
         key = (sub.assignment_id, sub.user_id)
+        inferred_file = _resolve_file_url(sub)
+        if inferred_file and key not in file_fallback:
+            file_fallback[key] = inferred_file
         if key not in latest:
             latest[key] = sub
+    for key, sub in latest.items():
+        if not getattr(sub, "file_url", None):
+            sub.file_url = file_fallback.get(key)
     return [
         schemas.SubmissionWithUser(
             **schemas.SubmissionOut.model_validate(sub, from_attributes=True).model_dump(),
@@ -136,25 +202,35 @@ def list_submissions_for_classroom(
 @router.post("/{assignment_id}/upload", response_model=schemas.SubmissionOut)
 async def upload_submission_file(
     assignment_id: int,
+    content: str | None = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
     assignment = _get_assignment(db, assignment_id)
+    _ensure_submission_file_column(db)
+    now = datetime.now(timezone.utc)
+    if assignment.due_date and now > _as_utc(assignment.due_date):
+        raise HTTPException(status_code=400, detail="Past due date")
     _ensure_membership(db, assignment.classroom_id, user)
 
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", file.filename or "upload.bin")
     base_dir = Path(settings.UPLOAD_DIR) / "submissions" / f"assignment_{assignment_id}"
     base_dir.mkdir(parents=True, exist_ok=True)
-    dest = base_dir / f"user{user.id}_{int(datetime.utcnow().timestamp())}_{safe_name}"
+    dest = base_dir / f"user{user.id}_{int(now.timestamp())}_{safe_name}"
 
-    content = await file.read()
-    dest.write_bytes(content)
+    file_bytes = await file.read()
+    dest.write_bytes(file_bytes)
+
+    file_url = f"/uploads/submissions/assignment_{assignment_id}/{dest.name}"
+    submission_content = content.strip() if content else f"File upload: {safe_name}"
 
     submission = models.Submission(
         user_id=user.id,
         assignment_id=assignment.id,
-        content=str(dest),
+        content=submission_content,
+        file_url=file_url,
+        submitted_at=now,
     )
     db.add(submission)
     db.commit()
@@ -169,6 +245,7 @@ def grade_submission(
     db: Session = Depends(get_db),
     instructor=Depends(require_instructor),
 ):
+    _ensure_submission_file_column(db)
     submission = (
         db.query(models.Submission).filter(models.Submission.id == submission_id).first()
     )

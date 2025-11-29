@@ -808,10 +808,6 @@ function SubmissionRow({
   const fileUrl = submission.file_url ?? null;
   const submittedAtLocal = formatLebanonDateTime(submission.submitted_at);
 
-  // 🔗 paths for detailed views
-  const instructorSubmissionPath = `/instructor/submissions/${submission.id}`;
-  const studentSubmissionPath = `/student/submissions/${submission.id}`;
-
   return (
     <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 space-y-3">
       {/* Top row: student + time + grade + view buttons */}
@@ -868,38 +864,6 @@ function SubmissionRow({
             )}
           </Button>
 
-          {/* 👇 NEW: pass submission via state to the detailed pages */}
-          <Link
-            to={instructorSubmissionPath}
-            target="_blank"
-            rel="noreferrer"
-            state={{ submission }}
-          >
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="border-slate-700 text-slate-200"
-            >
-              Instructor view
-            </Button>
-          </Link>
-
-          <Link
-            to={studentSubmissionPath}
-            target="_blank"
-            rel="noreferrer"
-            state={{ submission }}
-          >
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="text-cyan-300 hover:text-cyan-200"
-            >
-              Student view
-            </Button>
-          </Link>
         </div>
       </div>
 
