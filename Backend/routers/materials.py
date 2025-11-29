@@ -73,13 +73,24 @@ async def upload_material(
     if classroom.instructor_id != instructor.id and instructor.role != models.UserRole.admin:
         raise HTTPException(status_code=403, detail="Not allowed for this classroom")
 
+    # ----- save file on disk -----
     base_dir = Path(settings.UPLOAD_DIR) / "materials" / f"classroom_{material.classroom_id}"
     base_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = "".join(ch if ch.isalnum() or ch in ("-", "_", ".", " ") else "_" for ch in (file.filename or "material.pdf"))
+
+    safe_name = "".join(
+        ch if ch.isalnum() or ch in ("-", "_", ".", " ") else "_"
+        for ch in (file.filename or "material.pdf")
+    )
     dest = base_dir / safe_name
     content = await file.read()
     dest.write_bytes(content)
-    material.file_url = f"/uploads/materials/classroom_{material.classroom_id}/{safe_name}"
+
+    # ----- build public URL (absolute) -----
+    # Static mount in main.py: app.mount("/uploads", ...)
+    static_rel = f"/uploads/materials/classroom_{material.classroom_id}/{safe_name}"
+    backend_base = settings.BACKEND_BASE_URL.rstrip("/")
+    material.file_url = f"{backend_base}{static_rel}"
+
     db.add(material)
     db.commit()
     db.refresh(material)
