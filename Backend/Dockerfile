@@ -13,7 +13,9 @@ COPY Backend /app/Backend
 COPY services /app/services
 
 # Create uploads folder
-RUN mkdir -p /app/uploads
+RUN mkdir -p /app/uploads /app/db
+
+ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
