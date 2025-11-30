@@ -11,14 +11,33 @@ export default function VerifyEmail() {
 
   const [token, setToken] = useState(searchParams.get("token") ?? "");
   const [loading, setLoading] = useState(false);
-  const [banner, setBanner] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [banner, setBanner] = useState<{ type: "success" | "error"; msg: string } | null>(
+    null,
+  );
+
+  const status = searchParams.get("status");
+  const alreadyVerified = status === "verified";
 
   useEffect(() => {
     const urlToken = searchParams.get("token");
     if (urlToken) setToken(urlToken);
-  }, [searchParams]);
+
+    if (alreadyVerified) {
+      setBanner({
+        type: "success",
+        msg: "Your email has been verified! You can now log in.",
+      });
+    }
+  }, [searchParams, alreadyVerified]);
 
   async function handleVerify() {
+    // If backend already verified and redirected with status=verified,
+    // just go to login and don't call the API again.
+    if (alreadyVerified) {
+      navigate("/login");
+      return;
+    }
+
     if (!token) {
       setBanner({ type: "error", msg: "Invalid or missing token." });
       return;
@@ -36,7 +55,9 @@ export default function VerifyEmail() {
       setTimeout(() => navigate("/login"), 1500);
     } catch (err) {
       const msg =
-        err instanceof ApiError ? err.message : "Verification failed. Please request a new link.";
+        err instanceof ApiError
+          ? err.message
+          : "Verification failed. Please request a new link.";
       setBanner({ type: "error", msg });
     } finally {
       setLoading(false);
@@ -57,7 +78,9 @@ export default function VerifyEmail() {
           <div className="mx-auto max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6 shadow">
             <h1 className="text-2xl font-bold tracking-tight">Verify your email</h1>
             <p className="mt-2 text-slate-300">
-              Click the button below to complete your email verification.
+              {alreadyVerified
+                ? "Your email is already verified. You can now log in."
+                : "Click the button below to complete your email verification."}
             </p>
 
             {banner && (
@@ -77,7 +100,11 @@ export default function VerifyEmail() {
               disabled={loading}
               onClick={handleVerify}
             >
-              {loading ? "Verifying..." : "Verify Email"}
+              {alreadyVerified
+                ? "Go to Login"
+                : loading
+                ? "Verifying..."
+                : "Verify Email"}
             </Button>
           </div>
         </main>
