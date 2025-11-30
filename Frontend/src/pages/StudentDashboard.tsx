@@ -232,7 +232,7 @@ export default function StudentDashboard() {
                         <button
                           className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800/60"
                           onClick={() =>
-                            nav(`/student/classrooms/${c.id}`)
+                            nav(`/student/classroom/${c.id}`)
                           }
                         >
                           Open Class <ChevronRight className="h-4 w-4" />

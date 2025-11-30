@@ -1,6 +1,6 @@
-import React from "react";
-import { useLocation } from "react-router-dom";
-import { Submission, AUTH_BASE_URL } from "@/lib/api";
+import React, { useEffect, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
+import { Submission, AUTH_BASE_URL, getSubmissionById, ApiError } from "@/lib/api";
 import NavBarUser from "@/components/ui/NavBarUser";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -15,26 +15,57 @@ type LocationState = {
 
 export default function StudentSubmissionPage() {
   const { user } = useAuth();
+  const { submissionId } = useParams<{ submissionId: string }>();
   const location = useLocation();
   const state = location.state as LocationState | null;
-  const submission = state?.submission;
 
-  if (!submission) {
+  const [submission, setSubmission] = useState<Submission | null>(state?.submission ?? null);
+  const [loading, setLoading] = useState(!state?.submission);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch from backend if user entered directly by URL
+  useEffect(() => {
+    if (submission) return;
+    if (!submissionId) return;
+
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getSubmissionById(Number(submissionId));
+        setSubmission(data);
+      } catch (err) {
+        const msg = err instanceof ApiError ? err.message : "Failed to load submission.";
+        setError(msg);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [submissionId, submission]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+        <NavBarUser email={user?.email} role={user?.role ?? "student"} />
+        <div className="mt-6 text-slate-300">Loading your submission...</div>
+      </div>
+    );
+  }
+
+  if (error || !submission) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
         <NavBarUser email={user?.email} role={user?.role ?? "student"} />
         <div className="mt-6 text-sm text-rose-300">
-          No submission data provided. Please open this page from your
-          classroom/assignment.
+          {error ?? "No submission found."}
         </div>
       </div>
     );
   }
 
-  const localTime = parseBackendTime(submission.submitted_at).toLocaleString(
-    "en-LB",
-    { timeZone: "Asia/Beirut" },
-  );
+  const localTime = parseBackendTime(submission.submitted_at).toLocaleString("en-LB", {
+    timeZone: "Asia/Beirut",
+  });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">

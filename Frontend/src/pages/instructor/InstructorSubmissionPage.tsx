@@ -1,6 +1,12 @@
-import React from "react";
-import { useLocation } from "react-router-dom";
-import { Submission, AUTH_BASE_URL } from "@/lib/api";
+// src/pages/instructor/InstructorSubmissionPage.tsx
+import React, { useEffect, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
+import {
+  Submission,
+  AUTH_BASE_URL,
+  getSubmissionById,
+  ApiError,
+} from "@/lib/api";
 import NavBarUser from "@/components/ui/NavBarUser";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -15,26 +21,62 @@ type LocationState = {
 
 export default function InstructorSubmissionPage() {
   const { user } = useAuth();
+  const { submissionId } = useParams<{ submissionId: string }>();
   const location = useLocation();
   const state = location.state as LocationState | null;
-  const submission = state?.submission;
 
-  if (!submission) {
+  const [submission, setSubmission] = useState<Submission | null>(
+    state?.submission ?? null,
+  );
+  const [loading, setLoading] = useState(!state?.submission);
+  const [error, setError] = useState<string | null>(null);
+
+  // If opened directly by URL (no location.state), fetch from backend
+  useEffect(() => {
+    if (submission) return;
+    if (!submissionId) return;
+
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getSubmissionById(Number(submissionId));
+        setSubmission(data);
+      } catch (err) {
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : "Failed to load submission.";
+        setError(msg);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [submissionId, submission]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+        <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
+        <div className="mt-6 text-slate-300">Loading submission...</div>
+      </div>
+    );
+  }
+
+  if (error || !submission) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
         <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
         <div className="mt-6 text-sm text-rose-300">
-          No submission data provided. Please open this page from the classroom
-          submissions list.
+          {error ?? "No submission found. Please open this page from the classroom submissions list."}
         </div>
       </div>
     );
   }
 
-  const localTime = parseBackendTime(submission.submitted_at).toLocaleString(
-    "en-LB",
-    { timeZone: "Asia/Beirut" },
-  );
+  const localTime = parseBackendTime(
+    submission.submitted_at,
+  ).toLocaleString("en-LB", { timeZone: "Asia/Beirut" });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
@@ -52,12 +94,13 @@ export default function InstructorSubmissionPage() {
             <span className="font-semibold">Submitted at: </span>
             {localTime}
           </div>
-          {submission.grade !== null && submission.grade !== undefined && (
-            <div>
-              <span className="font-semibold">Grade: </span>
-              {submission.grade}
-            </div>
-          )}
+          {submission.grade !== null &&
+            submission.grade !== undefined && (
+              <div>
+                <span className="font-semibold">Grade: </span>
+                {submission.grade}
+              </div>
+            )}
         </div>
 
         {submission.content && (

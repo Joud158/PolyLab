@@ -563,6 +563,12 @@ export async function disableTotpMfa(code: string): Promise<BasicOk> {
   });
 }
 
+export async function getSubmissionById(id: number): Promise<Submission> {
+  const res = await request(`/submissions/${id}`, { method: "GET" });
+  return res as Submission;
+}
+
+
 export const api = {
   signup,
   login,
@@ -594,4 +600,8 @@ export const api = {
   enrollTotpMfa,
   verifyTotpMfa,
   disableTotpMfa,
+  getSubmissionById,   // ← add this if you like
 };
+
+
+

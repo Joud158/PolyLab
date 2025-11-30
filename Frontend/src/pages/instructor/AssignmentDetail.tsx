@@ -1,27 +1,48 @@
+// src/pages/instructor/AssignmentDetail.tsx
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import NavBarUser from "@/components/ui/NavBarUser";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ApiError, Assignment, Submission, AUTH_BASE_URL, getAssignment, listSubmissionsForAssignment, gradeSubmission } from "@/lib/api";
+import {
+  ApiError,
+  Assignment,
+  Submission,
+  AUTH_BASE_URL,
+  getAssignment,
+  listSubmissionsForAssignment,
+  gradeSubmission,
+} from "@/lib/api";
 import { Clock3, ExternalLink } from "lucide-react";
 import bgCircuit from "@/assets/background.png";
 import { useAuth } from "@/contexts/AuthContext";
 
+/** Parse backend ISO time; treat naive timestamps as UTC (append Z). */
+function parseBackendTime(iso: string): Date {
+  if (/[zZ]|[+-]\d\d:\d\d$/.test(iso)) return new Date(iso);
+  return new Date(iso + "Z");
+}
+
+/** Relative time that uses parseBackendTime so offsets are correct. */
 function relativeTime(iso: string): string {
   const now = Date.now();
-  const then = new Date(iso).getTime();
+  const then = parseBackendTime(iso).getTime();
   const diffMs = now - then;
   const diffSec = Math.round(diffMs / 1000);
   const diffMin = Math.round(diffSec / 60);
   const diffHr = Math.round(diffMin / 60);
   const diffDay = Math.round(diffHr / 24);
+
   if (diffSec < 45) return "just now";
   if (diffMin < 90) return `${diffMin}m ago`;
   if (diffHr < 36) return `${diffHr}h ago`;
   if (diffDay < 14) return `${diffDay}d ago`;
-  return new Date(iso).toLocaleString();
+
+  // For older dates, show absolute time in Beirut
+  return parseBackendTime(iso).toLocaleString("en-LB", {
+    timeZone: "Asia/Beirut",
+  });
 }
 
 export default function AssignmentDetail() {
@@ -47,7 +68,8 @@ export default function AssignmentDetail() {
       const s = await listSubmissionsForAssignment(idNum);
       setSubs(s);
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to load assignment";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to load assignment";
       setError(msg);
     } finally {
       setLoading(false);
@@ -61,12 +83,17 @@ export default function AssignmentDetail() {
   if (loading) {
     return (
       <div className="relative min-h-screen bg-slate-950 text-slate-100">
-        <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+          style={{ backgroundImage: `url(${bgCircuit})` }}
+        />
         <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
         <div className="relative z-10">
           <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
           <main className="mx-auto max-w-4xl px-4 py-10">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">Loading...</div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
+              Loading...
+            </div>
           </main>
         </div>
       </div>
@@ -76,7 +103,10 @@ export default function AssignmentDetail() {
   if (!assignment) {
     return (
       <div className="relative min-h-screen bg-slate-950 text-slate-100">
-        <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+          style={{ backgroundImage: `url(${bgCircuit})` }}
+        />
         <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
         <div className="relative z-10">
           <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
@@ -99,12 +129,18 @@ export default function AssignmentDetail() {
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100">
-      <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+        style={{ backgroundImage: `url(${bgCircuit})` }}
+      />
       <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
       <div className="relative z-10">
         <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
         <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-10 space-y-6">
-          <PageHeader title={`Asg ${assignment.id}: ${assignment.title}`} subtitle={`Classroom ID: ${assignment.classroom_id}`} />
+          <PageHeader
+            title={`Asg ${assignment.id}: ${assignment.title}`}
+            subtitle={`Classroom ID: ${assignment.classroom_id}`}
+          />
 
           {error && (
             <div className="rounded-lg border border-rose-700/40 bg-rose-900/20 px-4 py-3 text-rose-200 text-sm">
@@ -113,10 +149,16 @@ export default function AssignmentDetail() {
           )}
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-2">
-            <div className="text-sm text-slate-300 whitespace-pre-line">{assignment.description || "No description"}</div>
+            <div className="text-sm text-slate-300 whitespace-pre-line">
+              {assignment.description || "No description"}
+            </div>
             <div className="text-xs text-slate-500 flex items-center gap-2">
               <Clock3 className="h-4 w-4" />
-              {assignment.due_date ? `Due ${new Date(assignment.due_date).toLocaleString()}` : "No due date"}
+              {assignment.due_date
+                ? `Due ${new Date(assignment.due_date).toLocaleString("en-LB", {
+                    timeZone: "Asia/Beirut",
+                  })}`
+                : "No due date"}
             </div>
             {assignment.attachment_url && (
               <a
@@ -158,9 +200,12 @@ export default function AssignmentDetail() {
 }
 
 function SubmissionRow({ submission }: { submission: Submission }) {
-  const [gradeInput, setGradeInput] = useState<string | number>(submission.grade ?? "");
+  const [gradeInput, setGradeInput] = useState<string | number>(
+    submission.grade ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   async function saveGrade() {
     const num = Number(gradeInput);
@@ -183,11 +228,27 @@ function SubmissionRow({ submission }: { submission: Submission }) {
 
   return (
     <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 space-y-2">
-      <div className="flex justify-between text-sm text-slate-200">
+      <div className="flex justify-between text-sm text-slate-200 gap-3">
         <div>
-          <div className="font-semibold">{submission.user_email ?? `User #${submission.user_id}`}</div>
-          <div className="text-xs text-slate-400">Submitted {relativeTime(submission.submitted_at)}</div>
+          <div className="font-semibold">
+            {submission.user_email ?? `User #${submission.user_id}`}
+          </div>
+          <div className="text-xs text-slate-400">
+            Submitted {relativeTime(submission.submitted_at)}
+          </div>
+          <button
+            type="button"
+            className="mt-1 inline-flex items-center text-xs text-cyan-300 hover:text-cyan-200 underline"
+            onClick={() =>
+              navigate(`/instructor/submissions/${submission.id}`, {
+                state: { submission },
+              })
+            }
+          >
+            View submission
+          </button>
         </div>
+
         <div className="flex items-center gap-2">
           <Input
             type="number"
@@ -197,15 +258,26 @@ function SubmissionRow({ submission }: { submission: Submission }) {
             placeholder="Score"
           />
           <span className="text-xs text-slate-400">/ 100</span>
-          <Button size="sm" variant="outline" className="border-slate-700 text-slate-200" disabled={saving} onClick={saveGrade}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-slate-700 text-slate-200"
+            disabled={saving}
+            onClick={saveGrade}
+          >
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
+
       {err && <div className="text-xs text-rose-300">{err}</div>}
-      {submission.grade !== null && submission.grade !== undefined && !err && (
-        <div className="text-xs text-emerald-300">Grade saved: {submission.grade}/100</div>
-      )}
+      {submission.grade !== null &&
+        submission.grade !== undefined &&
+        !err && (
+          <div className="text-xs text-emerald-300">
+            Grade saved: {submission.grade}/100
+          </div>
+        )}
     </div>
   );
 }

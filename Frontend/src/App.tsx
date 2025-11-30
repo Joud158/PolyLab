@@ -1,5 +1,5 @@
 // src/App.tsx
-import React from "react";
+import React, { ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import LandingPage from "@/pages/LandingPage";
@@ -31,16 +31,27 @@ import StudentSubmissionPage from "@/pages/student/StudentSubmissionPage";
 
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
-function RoleRoute({ allow, children }) {
+type Role = "student" | "instructor" | "admin";
+
+type RoleRouteProps = {
+  allow: Role[];
+  children: ReactNode;
+};
+
+function RoleRoute({ allow, children }: RoleRouteProps) {
   const { user, loading } = useAuth();
+
   if (loading) return null;
+
   if (!user) return <Navigate to="/login" replace />;
-  if (!allow.includes(user.role)) {
+
+  if (!allow.includes(user.role as Role)) {
     if (user.role === "student") return <Navigate to="/student" replace />;
     if (user.role === "instructor") return <Navigate to="/instructor" replace />;
     if (user.role === "admin") return <Navigate to="/admin" replace />;
     return <Navigate to="/" replace />;
   }
+
   return <>{children}</>;
 }
 

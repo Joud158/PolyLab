@@ -1,5 +1,6 @@
+// src/pages/instructor/ClassroomDetail.tsx
 import React, { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import NavBarUser from "@/components/ui/NavBarUser";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -263,8 +264,7 @@ export default function ClassroomDetail() {
                 <div>
                   <div className="text-lg font-semibold">
                     Asg{" "}
-                    {asgNumberMap[selectedAssignment.id] ??
-                      selectedAssignment.id}
+                    {asgNumberMap[selectedAssignment.id] ?? selectedAssignment.id}
                     : {selectedAssignment.title}
                   </div>
                   {selectedAssignment.description && (
@@ -784,6 +784,7 @@ function SubmissionRow({
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [showDetails, setShowDetails] = React.useState(false);
+  const navigate = useNavigate();
 
   async function saveGrade() {
     const num = Number(gradeInput);
@@ -864,6 +865,20 @@ function SubmissionRow({
             )}
           </Button>
 
+          {/* Open full-page detailed view */}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="border-slate-700 text-slate-200"
+            onClick={() =>
+              navigate(`/instructor/submissions/${submission.id}`, {
+                state: { submission },
+              })
+            }
+          >
+            Open full page
+          </Button>
         </div>
       </div>
 
@@ -908,4 +923,3 @@ function SubmissionRow({
     </div>
   );
 }
-
