@@ -85,34 +85,6 @@ Includes a full finite-field arithmetic engine for:
 
 ---
 
-## 📦 Installation Instructions
-
-### 1️⃣ Clone the Repository
-```bash
-git clone https://github.com/Joud158/PolyLab.git
-cd PolyLab
-```
-
----
-
-## 2️⃣ Backend Setup (Local)
-```bash
-cd Backend
-pip install -r requirements.txt
-uvicorn Backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
----
-
-## 3️⃣ Frontend Setup (Local)
-```bash
-cd Frontend
-npm install
-npm run dev
-```
-
----
-
 ## 📁 Project Structure
 
 ```
