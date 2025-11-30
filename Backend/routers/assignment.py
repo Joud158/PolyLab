@@ -86,8 +86,7 @@ def _store_attachment(assignment_id: int, filename: str, content: bytes) -> str:
 
     # Static path under the /uploads mount
     static_rel = f"/uploads/assignments/assignment_{assignment_id}/{safe_name}"
-    backend_base = settings.BACKEND_BASE_URL.rstrip("/")
-    return f"{backend_base}{static_rel}"
+    return f"{settings.backend_base_public}{static_rel}"
 
 
 def _ensure_attachment_column(db: Session) -> None:

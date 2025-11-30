@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "PolyLab API"
-    DEBUG: bool = True
+    DEBUG: bool = False
     BACKEND_BASE_URL: str = "http://127.0.0.1:8000"
 
     # Security / Sessions
@@ -44,6 +44,17 @@ class Settings(BaseSettings):
         env_file=str(Path(__file__).resolve().parents[2] / ".env"),
         extra="ignore",
     )
+
+    @property
+    def backend_base_public(self) -> str:
+        """
+        Absolute backend origin with trailing slashes removed and any `/api` suffix stripped.
+        This avoids generating broken file URLs like https://host/api/uploads/....
+        """
+        base = self.BACKEND_BASE_URL.rstrip("/")
+        if base.lower().endswith("/api"):
+            base = base[:-4]
+        return base
 
 
 settings = Settings()

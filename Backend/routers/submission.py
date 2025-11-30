@@ -90,8 +90,7 @@ def _resolve_file_url(submission: models.Submission) -> str | None:
     if not static_rel:
         return None
 
-    backend_base = settings.BACKEND_BASE_URL.rstrip("/")
-    return f"{backend_base}{static_rel}"
+    return f"{settings.backend_base_public}{static_rel}"
 
 
 @router.post("/", response_model=schemas.SubmissionOut)
@@ -242,8 +241,7 @@ async def upload_submission_file(
 
     # Build absolute URL to the uploaded file
     static_rel = f"/uploads/submissions/assignment_{assignment_id}/{dest.name}"
-    backend_base = settings.BACKEND_BASE_URL.rstrip("/")
-    file_url = f"{backend_base}{static_rel}"
+    file_url = f"{settings.backend_base_public}{static_rel}"
 
     submission_content = content.strip() if content else f"File upload: {safe_name}"
 

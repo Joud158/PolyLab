@@ -88,8 +88,7 @@ async def upload_material(
     # ----- build public URL (absolute) -----
     # Static mount in main.py: app.mount("/uploads", ...)
     static_rel = f"/uploads/materials/classroom_{material.classroom_id}/{safe_name}"
-    backend_base = settings.BACKEND_BASE_URL.rstrip("/")
-    material.file_url = f"{backend_base}{static_rel}"
+    material.file_url = f"{settings.backend_base_public}{static_rel}"
 
     db.add(material)
     db.commit()

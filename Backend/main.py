@@ -97,13 +97,18 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # Middleware: CORS + Security headers
 # ---------------------------------------------------------------------------
-# We hard-code allowed origins so that Render + the deployed frontend work.
+allow_origins = list(
+    dict.fromkeys(
+        [
+            *settings.CORS_ORIGINS,
+            settings.FRONTEND_ORIGIN,
+        ]
+    )
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://polylab-website.onrender.com",
-        "http://localhost:5173",  # keep local dev working
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
