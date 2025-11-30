@@ -45,6 +45,13 @@ function relativeTime(iso: string): string {
   });
 }
 
+/** Safely build a file URL: if already absolute, return as-is; otherwise prefix AUTH_BASE_URL. */
+function buildFileUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${AUTH_BASE_URL}${url}`;
+}
+
 export default function AssignmentDetail() {
   const { assignmentId } = useParams();
   const nav = useNavigate();
@@ -127,6 +134,8 @@ export default function AssignmentDetail() {
     );
   }
 
+  const attachmentHref = buildFileUrl(assignment.attachment_url);
+
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100">
       <div
@@ -155,14 +164,17 @@ export default function AssignmentDetail() {
             <div className="text-xs text-slate-500 flex items-center gap-2">
               <Clock3 className="h-4 w-4" />
               {assignment.due_date
-                ? `Due ${new Date(assignment.due_date).toLocaleString("en-LB", {
-                    timeZone: "Asia/Beirut",
-                  })}`
+                ? `Due ${new Date(assignment.due_date).toLocaleString(
+                    "en-LB",
+                    {
+                      timeZone: "Asia/Beirut",
+                    },
+                  )}`
                 : "No due date"}
             </div>
-            {assignment.attachment_url && (
+            {attachmentHref && (
               <a
-                href={`${AUTH_BASE_URL}${assignment.attachment_url}`}
+                href={attachmentHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"

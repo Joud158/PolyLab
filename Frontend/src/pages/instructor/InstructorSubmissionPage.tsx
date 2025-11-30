@@ -3,9 +3,9 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import {
   Submission,
-  AUTH_BASE_URL,
   getSubmissionById,
   ApiError,
+  buildFileUrl,
 } from "@/lib/api";
 import NavBarUser from "@/components/ui/NavBarUser";
 import { useAuth } from "@/contexts/AuthContext";
@@ -68,7 +68,8 @@ export default function InstructorSubmissionPage() {
       <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
         <NavBarUser email={user?.email} role={user?.role ?? "instructor"} />
         <div className="mt-6 text-sm text-rose-300">
-          {error ?? "No submission found. Please open this page from the classroom submissions list."}
+          {error ??
+            "No submission found. Please open this page from the classroom submissions list."}
         </div>
       </div>
     );
@@ -77,6 +78,8 @@ export default function InstructorSubmissionPage() {
   const localTime = parseBackendTime(
     submission.submitted_at,
   ).toLocaleString("en-LB", { timeZone: "Asia/Beirut" });
+
+  const fileHref = buildFileUrl(submission.file_url);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
@@ -114,10 +117,10 @@ export default function InstructorSubmissionPage() {
           </section>
         )}
 
-        {submission.file_url && (
+        {fileHref && (
           <section>
             <a
-              href={`${AUTH_BASE_URL}${submission.file_url}`}
+              href={fileHref}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200 underline"

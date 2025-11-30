@@ -1,3 +1,4 @@
+// src/pages/StudentClassroom.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import NavbarStudent from "@/components/ui/StudentNavbar";
@@ -17,6 +18,7 @@ import {
   listSubmissionsForAssignment,
   listMaterials,
   Material,
+  buildFileUrl,
 } from "@/lib/api";
 import { Clock3, Eye, EyeOff, Send } from "lucide-react";
 import bgCircuit from "@/assets/background.png";
@@ -28,7 +30,13 @@ function parseBackendTime(iso: string): Date {
 
 type DraftState = Record<
   number,
-  { content: string; file?: File | null; submitting: boolean; success?: string; error?: string }
+  {
+    content: string;
+    file?: File | null;
+    submitting: boolean;
+    success?: string;
+    error?: string;
+  }
 >;
 
 export default function StudentClassroom() {
@@ -56,8 +64,10 @@ export default function StudentClassroom() {
         return;
       }
       setClassroom(cls);
+
       const data = await listAssignments(classId);
       setAssignments(data);
+
       const mats = await listMaterials(classId);
       setMaterials(mats);
 
@@ -73,7 +83,8 @@ export default function StudentClassroom() {
       );
       setMySubs(Object.fromEntries(subsEntries));
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to load classroom data";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to load classroom data";
       setError(msg);
     } finally {
       setLoading(false);
@@ -86,7 +97,8 @@ export default function StudentClassroom() {
 
   const asgNumberMap = React.useMemo(() => {
     const sorted = [...assignments].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
     );
     const map: Record<number, number> = {};
     sorted.forEach((a, idx) => {
@@ -96,22 +108,36 @@ export default function StudentClassroom() {
   }, [assignments]);
 
   async function submit(assignmentId: number) {
-    const state = drafts[assignmentId] ?? { content: "", file: null, submitting: false };
+    const state =
+      drafts[assignmentId] ?? { content: "", file: null, submitting: false };
     if (!state.content.trim() && !state.file) {
       setDrafts((prev) => ({
         ...prev,
-        [assignmentId]: { ...state, error: "Add a short answer or attach a document before submitting." },
+        [assignmentId]: {
+          ...state,
+          error:
+            "Add a short answer or attach a document before submitting.",
+        },
       }));
       return;
     }
     const trimmedContent = state.content.trim();
     setDrafts((prev) => ({
       ...prev,
-      [assignmentId]: { ...state, submitting: true, error: undefined, success: undefined },
+      [assignmentId]: {
+        ...state,
+        submitting: true,
+        error: undefined,
+        success: undefined,
+      },
     }));
     try {
       if (state.file) {
-        await uploadAssignmentFile(assignmentId, state.file, trimmedContent || null);
+        await uploadAssignmentFile(
+          assignmentId,
+          state.file,
+          trimmedContent || null,
+        );
       } else {
         await submitAssignment(assignmentId, trimmedContent);
       }
@@ -119,10 +145,16 @@ export default function StudentClassroom() {
       setMySubs((prev) => ({ ...prev, [assignmentId]: subs }));
       setDrafts((prev) => ({
         ...prev,
-        [assignmentId]: { content: "", file: null, submitting: false, success: "Submitted!" },
+        [assignmentId]: {
+          content: "",
+          file: null,
+          submitting: false,
+          success: "Submitted!",
+        },
       }));
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Failed to submit. Try again.";
+      const msg =
+        e instanceof ApiError ? e.message : "Failed to submit. Try again.";
       setDrafts((prev) => ({
         ...prev,
         [assignmentId]: { ...state, submitting: false, error: msg },
@@ -142,12 +174,17 @@ export default function StudentClassroom() {
   if (loading) {
     return (
       <div className="relative min-h-screen bg-slate-950 text-slate-100">
-        <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+          style={{ backgroundImage: `url(${bgCircuit})` }}
+        />
         <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
         <div className="relative z-10">
           <NavbarStudent onLogout={() => console.log("logout")} />
           <main className="mx-auto max-w-3xl px-4 py-10">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">Loading classroom...</div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
+              Loading classroom...
+            </div>
           </main>
         </div>
       </div>
@@ -157,7 +194,10 @@ export default function StudentClassroom() {
   if (!classroom) {
     return (
       <div className="relative min-h-screen bg-slate-950 text-slate-100">
-        <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+          style={{ backgroundImage: `url(${bgCircuit})` }}
+        />
         <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
         <div className="relative z-10">
           <NavbarStudent onLogout={() => console.log("logout")} />
@@ -165,7 +205,11 @@ export default function StudentClassroom() {
             <div className="rounded-xl border border-rose-700/40 bg-rose-900/20 p-6">
               {error ?? "Classroom not found."}
             </div>
-            <Button variant="outline" className="mt-4 border-slate-700 text-slate-200" onClick={() => nav("/student")}>
+            <Button
+              variant="outline"
+              className="mt-4 border-slate-700 text-slate-200"
+              onClick={() => nav("/student")}
+            >
               Back to dashboard
             </Button>
           </main>
@@ -176,12 +220,18 @@ export default function StudentClassroom() {
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100">
-      <div className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none" style={{ backgroundImage: `url(${bgCircuit})` }} />
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-fixed pointer-events-none"
+        style={{ backgroundImage: `url(${bgCircuit})` }}
+      />
       <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
       <div className="relative z-10">
         <NavbarStudent onLogout={() => console.log("logout")} />
         <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-10">
-          <PageHeader title={classroom.name} subtitle={`Assignments • ${submittedCount} submitted`} />
+          <PageHeader
+            title={classroom.name}
+            subtitle={`Assignments • ${submittedCount} submitted`}
+          />
 
           {error && (
             <div className="mt-3 rounded-lg border border-rose-700/40 bg-rose-900/20 px-4 py-3 text-rose-200 text-sm">
@@ -204,26 +254,44 @@ export default function StudentClassroom() {
                 </div>
               ) : (
                 assignments.map((a) => {
-                  const draft = drafts[a.id] ?? { content: "", submitting: false };
+                  const draft =
+                    drafts[a.id] ?? { content: "", submitting: false };
                   const submitted = (mySubs[a.id] ?? [])[0];
+                  const attachmentHref = buildFileUrl(a.attachment_url);
+
                   return (
-                    <div key={a.id} className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
+                    <div
+                      key={a.id}
+                      className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-3"
+                    >
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <div className="text-lg font-semibold">
-                            {`Asg ${asgNumberMap[a.id] ?? ""} ${asgNumberMap[a.id] ? ":" : ""} ${a.title}`}
+                            {`Asg ${asgNumberMap[a.id] ?? ""} ${
+                              asgNumberMap[a.id] ? ":" : ""
+                            } ${a.title}`}
                           </div>
-                          {a.description && <div className="text-sm text-slate-300 whitespace-pre-line mt-1">{a.description}</div>}
+                          {a.description && (
+                            <div className="text-sm text-slate-300 whitespace-pre-line mt-1">
+                              {a.description}
+                            </div>
+                          )}
                           <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                             <Clock3 className="h-4 w-4" />
-                            {a.due_date ? `Due ${new Date(a.due_date).toLocaleString()}` : "No due date"}
+                            {a.due_date
+                              ? `Due ${new Date(
+                                  a.due_date,
+                                ).toLocaleString("en-LB", {
+                                  timeZone: "Asia/Beirut",
+                                })}`
+                              : "No due date"}
                           </div>
 
-                          {/* FIXED ATTACHMENT LINK */}
-                          {a.attachment_url && (
+                          {/* ATTACHMENT LINK (fixed) */}
+                          {attachmentHref && (
                             <div className="mt-2">
                               <a
-                                href={a.attachment_url}
+                                href={attachmentHref}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-sm text-cyan-300 hover:text-cyan-200 underline"
@@ -233,68 +301,94 @@ export default function StudentClassroom() {
                             </div>
                           )}
 
-                          {/* STUDENT SUBMISSION */}
-                          {submitted && (
-                            <div className="mt-3 space-y-2">
-                              <div className="text-xs text-emerald-300">
-                                Submitted at {parseBackendTime(submitted.submitted_at).toLocaleString()}
-                                {submitted.grade !== null && submitted.grade !== undefined ? ` • Grade: ${submitted.grade}` : ""}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 text-cyan-300 hover:text-cyan-200 px-2"
-                                onClick={() =>
-                                  setOpenSubs((prev) => ({ ...prev, [submitted.id]: !prev[submitted.id] }))
-                                }
-                              >
-                                {openSubs[submitted.id] ? (
-                                  <>
-                                    <EyeOff className="h-4 w-4 mr-1" /> Hide submission
-                                  </>
-                                ) : (
-                                  <>
-                                    <Eye className="h-4 w-4 mr-1" /> View what you submitted
-                                  </>
-                                )}
-                              </Button>
-
-                              {openSubs[submitted.id] && (
-                                <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-100">
-                                  {submitted.content && (
-                                    <div>
-                                      <div className="font-semibold text-slate-300 mb-1">Answer</div>
-                                      <pre className="whitespace-pre-wrap text-slate-100">{submitted.content}</pre>
-                                    </div>
-                                  )}
-
-                                  {/* FIXED SUBMITTED FILE LINK */}
-                                  {submitted.file_url && (
-                                    <a
-                                      href={submitted.file_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
-                                    >
-                                      Download your file
-                                    </a>
-                                  )}
+                          {/* STUDENT SUBMISSION SUMMARY + VIEW */}
+                          {submitted && (() => {
+                            const submittedFileHref = buildFileUrl(
+                              submitted.file_url,
+                            );
+                            return (
+                              <div className="mt-3 space-y-2">
+                                <div className="text-xs text-emerald-300">
+                                  Submitted at{" "}
+                                  {parseBackendTime(
+                                    submitted.submitted_at,
+                                  ).toLocaleString("en-LB", {
+                                    timeZone: "Asia/Beirut",
+                                  })}
+                                  {submitted.grade !== null &&
+                                  submitted.grade !== undefined
+                                    ? ` • Grade: ${submitted.grade}`
+                                    : ""}
                                 </div>
-                              )}
-                            </div>
-                          )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 text-cyan-300 hover:text-cyan-200 px-2"
+                                  onClick={() =>
+                                    setOpenSubs((prev) => ({
+                                      ...prev,
+                                      [submitted.id]: !prev[submitted.id],
+                                    }))
+                                  }
+                                >
+                                  {openSubs[submitted.id] ? (
+                                    <>
+                                      <EyeOff className="h-4 w-4 mr-1" /> Hide
+                                      submission
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye className="h-4 w-4 mr-1" /> View what
+                                      you submitted
+                                    </>
+                                  )}
+                                </Button>
+
+                                {openSubs[submitted.id] && (
+                                  <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-100">
+                                    {submitted.content && (
+                                      <div>
+                                        <div className="font-semibold text-slate-300 mb-1">
+                                          Answer
+                                        </div>
+                                        <pre className="whitespace-pre-wrap text-slate-100">
+                                          {submitted.content}
+                                        </pre>
+                                      </div>
+                                    )}
+
+                                    {submittedFileHref && (
+                                      <a
+                                        href={submittedFileHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+                                      >
+                                        Download your file
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 
                       {/* SUBMIT FORM */}
                       <div className="space-y-2">
-                        <label className="text-sm text-slate-300">Submit your work</label>
+                        <label className="text-sm text-slate-300">
+                          Submit your work
+                        </label>
                         <textarea
                           value={draft.content}
                           onChange={(e) =>
                             setDrafts((prev) => ({
                               ...prev,
-                              [a.id]: { ...(prev[a.id] ?? { submitting: false }), content: e.target.value },
+                              [a.id]: {
+                                ...(prev[a.id] ?? { submitting: false }),
+                                content: e.target.value,
+                              },
                             }))
                           }
                           rows={4}
@@ -310,22 +404,44 @@ export default function StudentClassroom() {
                               onChange={(e) =>
                                 setDrafts((prev) => ({
                                   ...prev,
-                                  [a.id]: { ...(prev[a.id] ?? { submitting: false, content: "" }), file: e.target.files?.[0] ?? null },
+                                  [a.id]: {
+                                    ...(prev[a.id] ?? {
+                                      submitting: false,
+                                      content: "",
+                                    }),
+                                    file: e.target.files?.[0] ?? null,
+                                  },
                                 }))
                               }
                             />
                           </label>
-                          {draft.file && <span className="text-xs text-slate-400">{draft.file.name}</span>}
+                          {draft.file && (
+                            <span className="text-xs text-slate-400">
+                              {draft.file.name}
+                            </span>
+                          )}
                         </div>
-                        {draft.error && <div className="text-sm text-rose-300">{draft.error}</div>}
-                        {draft.success && <div className="text-sm text-emerald-300">{draft.success}</div>}
+                        {draft.error && (
+                          <div className="text-sm text-rose-300">
+                            {draft.error}
+                          </div>
+                        )}
+                        {draft.success && (
+                          <div className="text-sm text-emerald-300">
+                            {draft.success}
+                          </div>
+                        )}
                         <Button
                           onClick={() => submit(a.id)}
                           disabled={draft.submitting}
                           className="h-10 bg-cyan-500 text-slate-900 hover:bg-cyan-400"
                         >
                           <Send className="h-4 w-4 mr-1" />
-                          {draft.submitting ? "Submitting..." : submitted ? "Resubmit" : "Submit"}
+                          {draft.submitting
+                            ? "Submitting..."
+                            : (mySubs[a.id] ?? []).length > 0
+                            ? "Resubmit"
+                            : "Submit"}
                         </Button>
                       </div>
                     </div>
@@ -338,28 +454,41 @@ export default function StudentClassroom() {
             <TabsContent value="materials" className="mt-4">
               <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
                 {materials.length === 0 ? (
-                  <div className="text-slate-300">No materials shared yet.</div>
+                  <div className="text-slate-300">
+                    No materials shared yet.
+                  </div>
                 ) : (
-                  materials.map((m) => (
-                    <div key={m.id} className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 flex items-start gap-3">
-                      <div className="flex-1">
-                        <div className="font-semibold text-slate-100">{m.title}</div>
-                        {m.description && <div className="text-sm text-slate-400">{m.description}</div>}
+                  materials.map((m) => {
+                    const materialHref = buildFileUrl(m.file_url);
+                    return (
+                      <div
+                        key={m.id}
+                        className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 flex items-start gap-3"
+                      >
+                        <div className="flex-1">
+                          <div className="font-semibold text-slate-100">
+                            {m.title}
+                          </div>
+                          {m.description && (
+                            <div className="text-sm text-slate-400">
+                              {m.description}
+                            </div>
+                          )}
 
-                        {/* FIXED MATERIALS LINK */}
-                        {m.file_url && (
-                          <a
-                            href={m.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1 inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
-                          >
-                            Download
-                          </a>
-                        )}
+                          {materialHref && (
+                            <a
+                              href={materialHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
+                            >
+                              Download
+                            </a>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </TabsContent>
@@ -372,20 +501,41 @@ export default function StudentClassroom() {
                 ) : (
                   Object.entries(mySubs).flatMap(([aid, subs]) =>
                     (subs || []).map((s) => {
-                      const assignment = assignments.find((a) => String(a.id) === String(aid));
+                      const assignment = assignments.find(
+                        (a) => String(a.id) === String(aid),
+                      );
+                      const subFileHref = buildFileUrl(s.file_url);
+
                       return (
-                        <div key={s.id} className="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
-                          <div className="font-semibold">{assignment?.title ?? `Assignment ${aid}`}</div>
+                        <div
+                          key={s.id}
+                          className="rounded-lg border border-slate-800 bg-slate-900/50 p-4"
+                        >
+                          <div className="font-semibold">
+                            {assignment?.title ?? `Assignment ${aid}`}
+                          </div>
                           <div className="text-sm text-slate-400 flex flex-wrap items-center gap-2">
                             <span>
-                              Submitted {parseBackendTime(s.submitted_at).toLocaleString()}
-                              {s.grade !== null && s.grade !== undefined ? ` • Grade: ${s.grade}` : ""}
+                              Submitted{" "}
+                              {parseBackendTime(
+                                s.submitted_at,
+                              ).toLocaleString("en-LB", {
+                                timeZone: "Asia/Beirut",
+                              })}
+                              {s.grade !== null && s.grade !== undefined
+                                ? ` • Grade: ${s.grade}`
+                                : ""}
                             </span>
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-7 text-cyan-300 hover:text-cyan-200 px-2"
-                              onClick={() => setOpenSubs((prev) => ({ ...prev, [s.id]: !prev[s.id] }))}
+                              onClick={() =>
+                                setOpenSubs((prev) => ({
+                                  ...prev,
+                                  [s.id]: !prev[s.id],
+                                }))
+                              }
                             >
                               {openSubs[s.id] ? (
                                 <>
@@ -403,15 +553,18 @@ export default function StudentClassroom() {
                             <div className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-200">
                               {s.content && (
                                 <div>
-                                  <div className="text-xs font-semibold text-slate-400 mb-1">What you wrote</div>
-                                  <pre className="whitespace-pre-wrap text-slate-100">{s.content}</pre>
+                                  <div className="text-xs font-semibold text-slate-400 mb-1">
+                                    What you wrote
+                                  </div>
+                                  <pre className="whitespace-pre-wrap text-slate-100">
+                                    {s.content}
+                                  </pre>
                                 </div>
                               )}
 
-                              {/* FIXED DOWNLOAD LINK */}
-                              {s.file_url && (
+                              {subFileHref && (
                                 <a
-                                  href={s.file_url}
+                                  href={subFileHref}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 text-xs"
@@ -431,7 +584,11 @@ export default function StudentClassroom() {
           </Tabs>
 
           <div className="mt-6">
-            <Button variant="outline" className="border-slate-700 text-slate-200" onClick={() => nav("/student")}>
+            <Button
+              variant="outline"
+              className="border-slate-700 text-slate-200"
+              onClick={() => nav("/student")}
+            >
               Back to dashboard
             </Button>
           </div>

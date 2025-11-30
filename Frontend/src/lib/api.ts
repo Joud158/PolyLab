@@ -104,6 +104,18 @@ function buildUrl(path: string): string {
   return `${base}${cleanPath}`;
 }
 
+/**
+ * Safely build a file URL used for downloads/previews.
+ * - If `url` is already absolute (http/https), return it as-is.
+ * - Otherwise, prefix it with AUTH_BASE_URL and ensure a single slash.
+ */
+export function buildFileUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const clean = url.startsWith("/") ? url : `/${url}`;
+  return `${AUTH_BASE_URL}${clean}`;
+}
+
 async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers ?? {});
@@ -568,7 +580,6 @@ export async function getSubmissionById(id: number): Promise<Submission> {
   return res as Submission;
 }
 
-
 export const api = {
   signup,
   login,
@@ -600,8 +611,5 @@ export const api = {
   enrollTotpMfa,
   verifyTotpMfa,
   disableTotpMfa,
-  getSubmissionById,   // ← add this if you like
+  getSubmissionById,
 };
-
-
-

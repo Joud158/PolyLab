@@ -10,7 +10,6 @@ import {
   Classroom,
   Assignment,
   AssignmentTemplate,
-  AUTH_BASE_URL,
   Material,
   listClassrooms,
   listAssignments,
@@ -23,6 +22,7 @@ import {
   createMaterial,
   uploadMaterialFile,
   gradeSubmission,
+  buildFileUrl,
 } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -197,6 +197,10 @@ export default function ClassroomDetail() {
     );
   }
 
+  const selectedAttachmentHref = buildFileUrl(
+    selectedAssignment?.attachment_url ?? null,
+  );
+
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100">
       <div
@@ -264,7 +268,8 @@ export default function ClassroomDetail() {
                 <div>
                   <div className="text-lg font-semibold">
                     Asg{" "}
-                    {asgNumberMap[selectedAssignment.id] ?? selectedAssignment.id}
+                    {asgNumberMap[selectedAssignment.id] ??
+                      selectedAssignment.id}
                     : {selectedAssignment.title}
                   </div>
                   {selectedAssignment.description && (
@@ -282,9 +287,9 @@ export default function ClassroomDetail() {
                   Close
                 </Button>
               </div>
-              {selectedAssignment.attachment_url && (
+              {selectedAttachmentHref && (
                 <a
-                  href={`${AUTH_BASE_URL}${selectedAssignment.attachment_url}`}
+                  href={selectedAttachmentHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
@@ -484,67 +489,70 @@ function AssignmentsPanel({
             No assignments yet. Add one above.
           </div>
         ) : (
-          assignments.map((a, idx) => (
-            <div
-              key={a.id}
-              className="rounded-lg border border-slate-800 bg-slate-900/50 p-4"
-            >
-              <div className="flex items-start gap-3">
-                <Inbox className="h-5 w-5 text-indigo-400 mt-0.5" />
-                <div>
-                  <div className="font-semibold">
-                    {`Asg ${asgNumberMap[a.id] ?? idx + 1}: ${a.title}`}
-                  </div>
-                  {a.description && (
-                    <div className="text-sm text-slate-400 whitespace-pre-line">
-                      {a.description}
+          assignments.map((a, idx) => {
+            const attachmentHref = buildFileUrl(a.attachment_url);
+            return (
+              <div
+                key={a.id}
+                className="rounded-lg border border-slate-800 bg-slate-900/50 p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <Inbox className="h-5 w-5 text-indigo-400 mt-0.5" />
+                  <div>
+                    <div className="font-semibold">
+                      {`Asg ${asgNumberMap[a.id] ?? idx + 1}: ${a.title}`}
                     </div>
-                  )}
-                  <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                    <Clock3 className="h-3.5 w-3.5" />{" "}
-                    {a.due_date
-                      ? `Due ${formatLebanonDateTime(a.due_date)}`
-                      : "No due date"}
-                  </div>
-                  {a.attachment_url && (
-                    <div className="mt-2">
-                      <a
-                        href={`${AUTH_BASE_URL}${a.attachment_url}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-cyan-300 hover:text-cyan-200 underline"
-                      >
-                        View attached file
-                      </a>
+                    {a.description && (
+                      <div className="text-sm text-slate-400 whitespace-pre-line">
+                        {a.description}
+                      </div>
+                    )}
+                    <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                      <Clock3 className="h-3.5 w-3.5" />{" "}
+                      {a.due_date
+                        ? `Due ${formatLebanonDateTime(a.due_date)}`
+                        : "No due date"}
                     </div>
-                  )}
-                  <div className="mt-2 flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-slate-700 text-slate-200"
-                      onClick={() => onSelect(a)}
-                    >
-                      Open inline
-                    </Button>
-                    <Link
-                      to={`/instructor/assignments/${a.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
+                    {attachmentHref && (
+                      <div className="mt-2">
+                        <a
+                          href={attachmentHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-cyan-300 hover:text-cyan-200 underline"
+                        >
+                          View attached file
+                        </a>
+                      </div>
+                    )}
+                    <div className="mt-2 flex gap-2">
                       <Button
                         size="sm"
-                        variant="ghost"
-                        className="text-cyan-300 hover:text-cyan-200"
+                        variant="outline"
+                        className="border-slate-700 text-slate-200"
+                        onClick={() => onSelect(a)}
                       >
-                        Open in new tab
+                        Open inline
                       </Button>
-                    </Link>
+                      <Link
+                        to={`/instructor/assignments/${a.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-cyan-300 hover:text-cyan-200"
+                        >
+                          Open in new tab
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -668,32 +676,35 @@ function MaterialsPanel({
             No materials yet. Upload slides, PDFs, or links.
           </div>
         ) : (
-          materials.map((m) => (
-            <div
-              key={m.id}
-              className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 flex items-start gap-3"
-            >
-              <FileText className="h-5 w-5 text-cyan-400 mt-0.5" />
-              <div className="flex-1">
-                <div className="font-semibold">{m.title}</div>
-                {m.description && (
-                  <div className="text-sm text-slate-400">
-                    {m.description}
-                  </div>
-                )}
-                {m.file_url && (
-                  <a
-                    href={`${AUTH_BASE_URL}${m.file_url}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
-                  >
-                    <Download className="h-4 w-4" /> Download
-                  </a>
-                )}
+          materials.map((m) => {
+            const fileHref = buildFileUrl(m.file_url);
+            return (
+              <div
+                key={m.id}
+                className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 flex items-start gap-3"
+              >
+                <FileText className="h-5 w-5 text-cyan-400 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-semibold">{m.title}</div>
+                  {m.description && (
+                    <div className="text-sm text-slate-400">
+                      {m.description}
+                    </div>
+                  )}
+                  {fileHref && (
+                    <a
+                      href={fileHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
+                    >
+                      <Download className="h-4 w-4" /> Download
+                    </a>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -806,7 +817,7 @@ function SubmissionRow({
     }
   }
 
-  const fileUrl = submission.file_url ?? null;
+  const fileHref = buildFileUrl(submission.file_url ?? null);
   const submittedAtLocal = formatLebanonDateTime(submission.submitted_at);
 
   return (
@@ -896,10 +907,10 @@ function SubmissionRow({
             </div>
           )}
 
-          {fileUrl && (
+          {fileHref && (
             <div>
               <a
-                href={`${AUTH_BASE_URL}${fileUrl}`}
+                href={fileHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-200"
