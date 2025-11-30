@@ -23,12 +23,22 @@ console.log("AUTH_BASE_URL =", AUTH_BASE_URL);
 // Small helper to build safe file URLs (relative or absolute)
 export function buildFileUrl(path?: string | null): string | null {
   if (!path) return null;
+
   // If backend already returned an absolute URL, use it directly
   if (/^https?:\/\//i.test(path)) return path;
-  // Ensure a single leading slash, then join with AUTH_BASE_URL
+
+  // Start from AUTH_BASE_URL but drop any trailing `/api`
+  let base = AUTH_BASE_URL.replace(/\/+$/, "");
+  if (base.toLowerCase().endsWith("/api")) {
+    base = base.slice(0, -4); // remove "/api"
+  }
+
+  // Ensure a single leading slash for the file path
   const clean = path.startsWith("/") ? path : `/${path}`;
-  return `${AUTH_BASE_URL}${clean}`;
+
+  return `${base}${clean}`;
 }
+
 
 // ---------------- Common helpers ----------------
 
