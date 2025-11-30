@@ -193,6 +193,8 @@ PolyLab/
 |   │   │   └──  utils.ts
 │   │   ├── pages/
 |   │   │   ├── admin/
+|   |   │   │   ├── AdminDashboard.tsx
+|   |   │   │   └── AdminRequestDetail.tsx
 |   │   │   ├── instructor/
 |   |   │   │   ├── AssignmentDetail.tsx
 |   |   │   │   ├── ClassroomDetail.tsx
