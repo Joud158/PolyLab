@@ -39,23 +39,17 @@ import {
 import bgCircuit from "@/assets/background.png";
 import { useAuth } from "@/contexts/AuthContext";
 
-/**
- * Helper to parse datetimes coming from the backend.
- * If the string has no timezone info, we treat it as UTC.
- */
+/** Helper to parse datetimes from the backend (naive → UTC). */
 function parseBackendTime(iso: string): Date {
-  // has explicit timezone like 2025-11-29T13:31:31+02:00 or Z
   if (/[zZ]|[+-]\d\d:\d\d$/.test(iso)) {
     return new Date(iso);
   }
-  // assume backend gave UTC without tz; force UTC
   return new Date(iso + "Z");
 }
 
-/**
- * Format a backend datetime string in Lebanon time.
- */
-function formatLebanonDateTime(iso: string): string {
+/** Format backend datetime in Lebanon time. */
+function formatLebanonDateTime(iso?: string | null): string {
+  if (!iso) return "-";
   return parseBackendTime(iso).toLocaleString("en-LB", {
     timeZone: "Asia/Beirut",
   });
@@ -64,6 +58,7 @@ function formatLebanonDateTime(iso: string): string {
 export default function ClassroomDetail() {
   const { classId } = useParams();
   const { user } = useAuth();
+
   const [classes, setClasses] = useState<Classroom[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [templates, setTemplates] = useState<AssignmentTemplate[]>([]);
@@ -197,10 +192,6 @@ export default function ClassroomDetail() {
     );
   }
 
-  const selectedAttachmentHref = buildFileUrl(
-    selectedAssignment?.attachment_url ?? null,
-  );
-
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100">
       <div
@@ -287,9 +278,9 @@ export default function ClassroomDetail() {
                   Close
                 </Button>
               </div>
-              {selectedAttachmentHref && (
+              {selectedAssignment.attachment_url && (
                 <a
-                  href={selectedAttachmentHref}
+                  href={buildFileUrl(selectedAssignment.attachment_url) ?? "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
@@ -635,7 +626,9 @@ function MaterialsPanel({
           />
         </div>
         <div className="md:col-span-3">
-          <label className="text-sm text-slate-300">Attach file (optional)</label>
+          <label className="text-sm text-slate-300">
+            Attach file (optional)
+          </label>
           <div className="mt-1 flex items-center gap-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-200">
             <input
               type="file"
@@ -677,7 +670,7 @@ function MaterialsPanel({
           </div>
         ) : (
           materials.map((m) => {
-            const fileHref = buildFileUrl(m.file_url);
+            const href = buildFileUrl(m.file_url);
             return (
               <div
                 key={m.id}
@@ -691,9 +684,9 @@ function MaterialsPanel({
                       {m.description}
                     </div>
                   )}
-                  {fileHref && (
+                  {href && (
                     <a
-                      href={fileHref}
+                      href={href}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="mt-1 inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
@@ -733,7 +726,7 @@ function SubmissionsPanel({
     if (diffMin < 90) return `${diffMin}m ago`;
     if (diffHr < 36) return `${diffHr}h ago`;
     if (diffDay < 14) return `${diffDay}d ago`;
-    return thenDate.toLocaleString("en-LB", { timeZone: "Asia/Beirut" });
+    return formatLebanonDateTime(iso);
   };
 
   const grouped = assignments.map((a, idx) => ({
@@ -817,7 +810,7 @@ function SubmissionRow({
     }
   }
 
-  const fileHref = buildFileUrl(submission.file_url ?? null);
+  const fileUrl = buildFileUrl(submission.file_url);
   const submittedAtLocal = formatLebanonDateTime(submission.submitted_at);
 
   return (
@@ -907,10 +900,10 @@ function SubmissionRow({
             </div>
           )}
 
-          {fileHref && (
+          {fileUrl && (
             <div>
               <a
-                href={fileHref}
+                href={fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-200"

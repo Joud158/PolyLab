@@ -1,12 +1,13 @@
+// src/pages/admin/AdminDashboard.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import NavBarUser from "@/components/ui/NavBarUser";
 import { Button } from "@/components/ui/button";
 import {
   ApiError,
-  AUTH_BASE_URL,
   listInstructorRequests,
   decideInstructorRequest,
   InstructorRequest as ApiInstructorRequest,
+  buildFileUrl,
 } from "@/lib/api";
 import {
   CheckCircle2,
@@ -17,7 +18,8 @@ import {
   ExternalLink,
   ArrowUpRight,
 } from "lucide-react";
-import bgCircuit from "@/assets/background.png"; // background image
+import bgCircuit from "@/assets/background.png";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ----------------------------- Types -----------------------------
 type AdminInstructorRequest = ApiInstructorRequest & {
@@ -27,6 +29,18 @@ type AdminInstructorRequest = ApiInstructorRequest & {
   user_email?: string | null;
 };
 
+// ------------------------ Time helpers --------------------------
+function parseBackendTime(iso: string): Date {
+  if (/[zZ]|[+-]\d\d:\d\d$/.test(iso)) return new Date(iso);
+  return new Date(iso + "Z");
+}
+
+function formatLebanonDateTime(iso?: string | null): string {
+  if (!iso) return "-";
+  return parseBackendTime(iso).toLocaleString("en-LB", {
+    timeZone: "Asia/Beirut",
+  });
+}
 
 // --------------------------- Small UI Bits ------------------------
 function Badge({
@@ -45,7 +59,9 @@ function Badge({
     indigo: "bg-indigo-500/10 text-indigo-300 border border-indigo-500/30",
   };
   return (
-    <span className={`px-2 py-0.5 rounded-md text-xs ${tones[tone]} whitespace-nowrap`}>
+    <span
+      className={`px-2 py-0.5 rounded-md text-xs ${tones[tone]} whitespace-nowrap`}
+    >
       {children}
     </span>
   );
@@ -71,7 +87,9 @@ function Toast({
       : "border-rose-500/40 bg-rose-500/10 text-rose-200";
   return (
     <div className="fixed bottom-4 right-4 z-[60]">
-      <div className={`rounded-xl border ${styles} px-4 py-3 shadow-lg min-w-[280px]`}>
+      <div
+        className={`rounded-xl border ${styles} px-4 py-3 shadow-lg min-w-[280px]`}
+      >
         <div className="font-semibold">{title}</div>
         {description && <div className="text-sm mt-0.5">{description}</div>}
         <div className="mt-2 text-right">
@@ -90,6 +108,8 @@ function Toast({
 
 // ----------------------------- Page ------------------------------
 export default function AdminDashboard() {
+  const { user } = useAuth();
+
   const [requests, setRequests] = useState<AdminInstructorRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [reqError, setReqError] = useState<string | null>(null);
@@ -109,7 +129,8 @@ export default function AdminDashboard() {
         const data = await listInstructorRequests();
         setRequests(data);
       } catch (e) {
-        const msg = e instanceof ApiError ? e.message : "Failed to load requests";
+        const msg =
+          e instanceof ApiError ? e.message : "Failed to load requests";
         setReqError(msg);
       } finally {
         setLoading(false);
@@ -131,7 +152,9 @@ export default function AdminDashboard() {
   async function approveReq(id: number) {
     try {
       await decideInstructorRequest(id, "approve");
-      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: "approved" } : r)));
+      setRequests((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: "approved" } : r)),
+      );
       setToast({
         open: true,
         tone: "success",
@@ -140,14 +163,21 @@ export default function AdminDashboard() {
       });
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Failed to approve";
-      setToast({ open: true, tone: "error", title: "Error", description: msg });
+      setToast({
+        open: true,
+        tone: "error",
+        title: "Error",
+        description: msg,
+      });
     }
   }
 
   async function rejectReq(id: number) {
     try {
       await decideInstructorRequest(id, "reject");
-      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: "rejected" } : r)));
+      setRequests((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: "rejected" } : r)),
+      );
       setToast({
         open: true,
         tone: "error",
@@ -156,7 +186,12 @@ export default function AdminDashboard() {
       });
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Failed to reject";
-      setToast({ open: true, tone: "error", title: "Error", description: msg });
+      setToast({
+        open: true,
+        tone: "error",
+        title: "Error",
+        description: msg,
+      });
     }
   }
 
@@ -172,7 +207,7 @@ export default function AdminDashboard() {
 
       {/* Foreground */}
       <div className="relative">
-        <NavBarUser email="admin@polylab.app" role="admin" />
+        <NavBarUser email={user?.email} role={user?.role ?? "admin"} />
 
         <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
           {/* Header */}
@@ -182,7 +217,8 @@ export default function AdminDashboard() {
               Admin Dashboard
             </h1>
             <p className="mt-1 text-slate-300">
-              Review instructor requests, manage users, and monitor platform status.
+              Review instructor requests, manage users, and monitor platform
+              status.
             </p>
           </div>
 
@@ -228,85 +264,108 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 {loading ? (
-                  <div className="text-sm text-slate-300">Loading requests...</div>
+                  <div className="text-sm text-slate-300">
+                    Loading requests...
+                  </div>
                 ) : requests.length === 0 ? (
                   <div className="text-sm text-slate-400">No requests.</div>
                 ) : (
                   requests
                     .slice()
-                    .sort(
-                      (a, b) =>
-                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-                    )
-                    .map((r) => (
-                    <div
-                      key={r.id}
-                      className="rounded-xl border border-slate-800 bg-slate-900/50 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="font-semibold">
-                            {r.user_email ?? `User #${r.user_id}`}
-                          </div>
-                          {r.note && <div className="text-sm text-slate-300">{r.note}</div>}
-                          <div className="text-xs text-slate-500">
-                            Submitted: {new Date(r.created_at).toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <a
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800/60"
-                            href={`/admin/requests/${r.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            aria-label={`Open details for ${r.user_email ?? r.user_id}`}
-                          >
-                            <ArrowUpRight className="h-4 w-4" />
-                            Open
-                          </a>
-                          {r.file_path && (
-                            <a
-                              className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800/60"
-                              href={r.file_path.startsWith("http") ? r.file_path : `${AUTH_BASE_URL}${r.file_path}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              aria-label={`Open proof for ${r.user_email ?? r.user_id}`}
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              Proof
-                            </a>
-                          )}
+                    .sort((a, b) => {
+                      const ta = a.created_at
+                        ? parseBackendTime(a.created_at).getTime()
+                        : 0;
+                      const tb = b.created_at
+                        ? parseBackendTime(b.created_at).getTime()
+                        : 0;
+                      return tb - ta;
+                    })
+                    .map((r) => {
+                      const proofHref = buildFileUrl(r.file_path);
+                      return (
+                        <div
+                          key={r.id}
+                          className="rounded-xl border border-slate-800 bg-slate-900/50 p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="font-semibold">
+                                {r.user_email ?? `User #${r.user_id}`}
+                              </div>
+                              {r.note && (
+                                <div className="text-sm text-slate-300">
+                                  {r.note}
+                                </div>
+                              )}
+                              <div className="text-xs text-slate-500">
+                                Submitted:{" "}
+                                {formatLebanonDateTime(r.created_at)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <a
+                                className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800/60"
+                                href={`/admin/requests/${r.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={`Open details for ${
+                                  r.user_email ?? r.user_id
+                                }`}
+                              >
+                                <ArrowUpRight className="h-4 w-4" />
+                                Open
+                              </a>
 
-                          {r.status === "pending" ? (
-                            <>
-                              <Button
-                                className="bg-emerald-500 text-slate-900 hover:bg-emerald-400"
-                                onClick={() => approveReq(r.id)}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
-                                onClick={() => rejectReq(r.id)}
-                              >
-                                Reject
-                              </Button>
-                            </>
-                          ) : (
-                            <Badge tone={r.status === "approved" ? "green" : "rose"}>
-                              {r.status[0].toUpperCase() + r.status.slice(1)}
-                            </Badge>
-                          )}
+                              {proofHref && (
+                                <a
+                                  className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800/60"
+                                  href={proofHref}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  aria-label={`Open proof for ${
+                                    r.user_email ?? r.user_id
+                                  }`}
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                  Proof
+                                </a>
+                              )}
+
+                              {r.status === "pending" ? (
+                                <>
+                                  <Button
+                                    className="bg-emerald-500 text-slate-900 hover:bg-emerald-400"
+                                    onClick={() => approveReq(r.id)}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
+                                    onClick={() => rejectReq(r.id)}
+                                  >
+                                    Reject
+                                  </Button>
+                                </>
+                              ) : (
+                                <Badge
+                                  tone={
+                                    r.status === "approved" ? "green" : "rose"
+                                  }
+                                >
+                                  {r.status[0].toUpperCase() +
+                                    r.status.slice(1)}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    ))
+                      );
+                    })
                 )}
               </div>
             </section>
-
-
           </div>
         </main>
       </div>
@@ -351,7 +410,9 @@ function CardStat({
         <div className="text-slate-300">{title}</div>
         <div className="text-cyan-300">{icon}</div>
       </div>
-      <div className="mt-2 text-3xl font-extrabold tracking-tight">{value}</div>
+      <div className="mt-2 text-3xl font-extrabold tracking-tight">
+        {value}
+      </div>
     </div>
   );
 }

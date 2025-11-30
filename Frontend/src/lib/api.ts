@@ -20,6 +20,16 @@ export const AUTH_BASE_URL: string = rawEnvBase.replace(/\/+$/, "");
 
 console.log("AUTH_BASE_URL =", AUTH_BASE_URL);
 
+// Small helper to build safe file URLs (relative or absolute)
+export function buildFileUrl(path?: string | null): string | null {
+  if (!path) return null;
+  // If backend already returned an absolute URL, use it directly
+  if (/^https?:\/\//i.test(path)) return path;
+  // Ensure a single leading slash, then join with AUTH_BASE_URL
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return `${AUTH_BASE_URL}${clean}`;
+}
+
 // ---------------- Common helpers ----------------
 
 const CSRF_COOKIE_NAME = "csrf_token";
@@ -102,18 +112,6 @@ function buildUrl(path: string): string {
   if (!path) return base;
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}${cleanPath}`;
-}
-
-/**
- * Safely build a file URL used for downloads/previews.
- * - If `url` is already absolute (http/https), return it as-is.
- * - Otherwise, prefix it with AUTH_BASE_URL and ensure a single slash.
- */
-export function buildFileUrl(url?: string | null): string | null {
-  if (!url) return null;
-  if (/^https?:\/\//i.test(url)) return url;
-  const clean = url.startsWith("/") ? url : `/${url}`;
-  return `${AUTH_BASE_URL}${clean}`;
 }
 
 async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
@@ -473,6 +471,11 @@ export async function listSubmissionsForClassroom(
   return request(`/submissions/classroom/${classroomId}`, { method: "GET" });
 }
 
+export async function getSubmissionById(id: number): Promise<Submission> {
+  const res = await request(`/submissions/${id}`, { method: "GET" });
+  return res as Submission;
+}
+
 // --- Materials ---
 
 export async function listMaterials(
@@ -575,11 +578,6 @@ export async function disableTotpMfa(code: string): Promise<BasicOk> {
   });
 }
 
-export async function getSubmissionById(id: number): Promise<Submission> {
-  const res = await request(`/submissions/${id}`, { method: "GET" });
-  return res as Submission;
-}
-
 export const api = {
   signup,
   login,
@@ -612,4 +610,5 @@ export const api = {
   verifyTotpMfa,
   disableTotpMfa,
   getSubmissionById,
+  buildFileUrl,
 };

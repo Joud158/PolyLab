@@ -1,4 +1,3 @@
-// src/pages/StudentClassroom.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import NavbarStudent from "@/components/ui/StudentNavbar";
@@ -23,9 +22,17 @@ import {
 import { Clock3, Eye, EyeOff, Send } from "lucide-react";
 import bgCircuit from "@/assets/background.png";
 
+// ---- Time helpers ----
 function parseBackendTime(iso: string): Date {
   if (/[zZ]|[+-]\d\d:\d\d$/.test(iso)) return new Date(iso);
   return new Date(iso + "Z");
+}
+
+function formatLebanonDateTime(iso?: string | null): string {
+  if (!iso) return "-";
+  return parseBackendTime(iso).toLocaleString("en-LB", {
+    timeZone: "Asia/Beirut",
+  });
 }
 
 type DraftState = Record<
@@ -42,6 +49,7 @@ type DraftState = Record<
 export default function StudentClassroom() {
   const { classId } = useParams();
   const nav = useNavigate();
+
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [drafts, setDrafts] = useState<DraftState>({});
@@ -98,7 +106,8 @@ export default function StudentClassroom() {
   const asgNumberMap = React.useMemo(() => {
     const sorted = [...assignments].sort(
       (a, b) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        parseBackendTime(a.created_at).getTime() -
+        parseBackendTime(b.created_at).getTime(),
     );
     const map: Record<number, number> = {};
     sorted.forEach((a, idx) => {
@@ -267,7 +276,7 @@ export default function StudentClassroom() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <div className="text-lg font-semibold">
-                            {`Asg ${asgNumberMap[a.id] ?? ""} ${
+                            {`Asg ${asgNumberMap[a.id] ?? ""}${
                               asgNumberMap[a.id] ? ":" : ""
                             } ${a.title}`}
                           </div>
@@ -279,15 +288,10 @@ export default function StudentClassroom() {
                           <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                             <Clock3 className="h-4 w-4" />
                             {a.due_date
-                              ? `Due ${new Date(
-                                  a.due_date,
-                                ).toLocaleString("en-LB", {
-                                  timeZone: "Asia/Beirut",
-                                })}`
+                              ? `Due ${formatLebanonDateTime(a.due_date)}`
                               : "No due date"}
                           </div>
 
-                          {/* ATTACHMENT LINK (fixed) */}
                           {attachmentHref && (
                             <div className="mt-2">
                               <a
@@ -301,77 +305,72 @@ export default function StudentClassroom() {
                             </div>
                           )}
 
-                          {/* STUDENT SUBMISSION SUMMARY + VIEW */}
-                          {submitted && (() => {
-                            const submittedFileHref = buildFileUrl(
-                              submitted.file_url,
-                            );
-                            return (
-                              <div className="mt-3 space-y-2">
-                                <div className="text-xs text-emerald-300">
-                                  Submitted at{" "}
-                                  {parseBackendTime(
-                                    submitted.submitted_at,
-                                  ).toLocaleString("en-LB", {
-                                    timeZone: "Asia/Beirut",
-                                  })}
-                                  {submitted.grade !== null &&
-                                  submitted.grade !== undefined
-                                    ? ` • Grade: ${submitted.grade}`
-                                    : ""}
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 text-cyan-300 hover:text-cyan-200 px-2"
-                                  onClick={() =>
-                                    setOpenSubs((prev) => ({
-                                      ...prev,
-                                      [submitted.id]: !prev[submitted.id],
-                                    }))
-                                  }
-                                >
-                                  {openSubs[submitted.id] ? (
-                                    <>
-                                      <EyeOff className="h-4 w-4 mr-1" /> Hide
-                                      submission
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Eye className="h-4 w-4 mr-1" /> View what
-                                      you submitted
-                                    </>
-                                  )}
-                                </Button>
-
-                                {openSubs[submitted.id] && (
-                                  <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-100">
-                                    {submitted.content && (
-                                      <div>
-                                        <div className="font-semibold text-slate-300 mb-1">
-                                          Answer
-                                        </div>
-                                        <pre className="whitespace-pre-wrap text-slate-100">
-                                          {submitted.content}
-                                        </pre>
-                                      </div>
-                                    )}
-
-                                    {submittedFileHref && (
-                                      <a
-                                        href={submittedFileHref}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
-                                      >
-                                        Download your file
-                                      </a>
-                                    )}
-                                  </div>
+                          {/* STUDENT SUBMISSION */}
+                          {submitted && (
+                            <div className="mt-3 space-y-2">
+                              <div className="text-xs text-emerald-300">
+                                Submitted at{" "}
+                                {formatLebanonDateTime(
+                                  submitted.submitted_at,
                                 )}
+                                {submitted.grade !== null &&
+                                submitted.grade !== undefined
+                                  ? ` • Grade: ${submitted.grade}`
+                                  : ""}
                               </div>
-                            );
-                          })()}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-cyan-300 hover:text-cyan-200 px-2"
+                                onClick={() =>
+                                  setOpenSubs((prev) => ({
+                                    ...prev,
+                                    [submitted.id]: !prev[submitted.id],
+                                  }))
+                                }
+                              >
+                                {openSubs[submitted.id] ? (
+                                  <>
+                                    <EyeOff className="h-4 w-4 mr-1" /> Hide
+                                    submission
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="h-4 w-4 mr-1" /> View what
+                                    you submitted
+                                  </>
+                                )}
+                              </Button>
+
+                              {openSubs[submitted.id] && (
+                                <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-100">
+                                  {submitted.content && (
+                                    <div>
+                                      <div className="font-semibold text-slate-300 mb-1">
+                                        Answer
+                                      </div>
+                                      <pre className="whitespace-pre-wrap text-slate-100">
+                                        {submitted.content}
+                                      </pre>
+                                    </div>
+                                  )}
+
+                                  {submitted.file_url && (
+                                    <a
+                                      href={buildFileUrl(
+                                        submitted.file_url,
+                                      )!}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+                                    >
+                                      Download your file
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -439,7 +438,7 @@ export default function StudentClassroom() {
                           <Send className="h-4 w-4 mr-1" />
                           {draft.submitting
                             ? "Submitting..."
-                            : (mySubs[a.id] ?? []).length > 0
+                            : submitted
                             ? "Resubmit"
                             : "Submit"}
                         </Button>
@@ -454,12 +453,10 @@ export default function StudentClassroom() {
             <TabsContent value="materials" className="mt-4">
               <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
                 {materials.length === 0 ? (
-                  <div className="text-slate-300">
-                    No materials shared yet.
-                  </div>
+                  <div className="text-slate-300">No materials shared yet.</div>
                 ) : (
                   materials.map((m) => {
-                    const materialHref = buildFileUrl(m.file_url);
+                    const href = buildFileUrl(m.file_url);
                     return (
                       <div
                         key={m.id}
@@ -475,9 +472,9 @@ export default function StudentClassroom() {
                             </div>
                           )}
 
-                          {materialHref && (
+                          {href && (
                             <a
-                              href={materialHref}
+                              href={href}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="mt-1 inline-flex items-center gap-1 text-sm text-cyan-300 hover:text-cyan-200"
@@ -504,8 +501,7 @@ export default function StudentClassroom() {
                       const assignment = assignments.find(
                         (a) => String(a.id) === String(aid),
                       );
-                      const subFileHref = buildFileUrl(s.file_url);
-
+                      const href = buildFileUrl(s.file_url);
                       return (
                         <div
                           key={s.id}
@@ -517,11 +513,7 @@ export default function StudentClassroom() {
                           <div className="text-sm text-slate-400 flex flex-wrap items-center gap-2">
                             <span>
                               Submitted{" "}
-                              {parseBackendTime(
-                                s.submitted_at,
-                              ).toLocaleString("en-LB", {
-                                timeZone: "Asia/Beirut",
-                              })}
+                              {formatLebanonDateTime(s.submitted_at)}
                               {s.grade !== null && s.grade !== undefined
                                 ? ` • Grade: ${s.grade}`
                                 : ""}
@@ -562,9 +554,9 @@ export default function StudentClassroom() {
                                 </div>
                               )}
 
-                              {subFileHref && (
+                              {href && (
                                 <a
-                                  href={subFileHref}
+                                  href={href}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 text-xs"
